@@ -463,7 +463,7 @@ const Dashboard = () => {
             )}
             <button
               className="px-4 py-2 bg-yellow-600 text-black rounded-md font-mono font-bold hover:bg-yellow-500 transition-colors"
-              onClick={() => router.push("/create")}
+              onClick={() => router.push("/zap-editor")}
             >
               Create New Zap
             </button>

@@ -69,7 +69,7 @@ export const AuthenticatedNavbar = ({
           <Link href="/dashboard">
             <Button7>Zaps</Button7>
           </Link>
-          <Link href="/create">
+          <Link href="/zap-editor">
             <Button1>Create Zap</Button1>
           </Link>
           <div className="relative group">
