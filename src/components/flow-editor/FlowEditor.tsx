@@ -16,6 +16,8 @@ import ReactFlow, {
   NodeTypes,
   EdgeTypes,
   MarkerType,
+  ConnectionLineType,
+  BackgroundVariant,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import CustomEdge from "./CustomEdge";
@@ -210,9 +212,18 @@ const FlowEditor: React.FC<FlowEditorProps> = ({
         }}
         style={{ width: "100%", height: "100%" }}
         fitView
-        fitViewOptions={{ padding: 0.15 }}
-        proOptions={{ hideAttribution: true }}
+        proOptions={{
+          hideAttribution: true,
+        }}
+        nodesDraggable={false}
       >
+        <Background
+          color="#333"
+          gap={16}
+          variant={"dots" as BackgroundVariant}
+        />
+        <Controls showInteractive={false} />
+
         <Background color="#333" gap={16} />
         <Controls />
       </ReactFlow>

@@ -1,7 +1,21 @@
 "use client";
 
-import React, { useCallback, useState, useRef, FC, useEffect } from "react";
-import { Node, Edge, NodeChange, EdgeChange, MarkerType } from "reactflow";
+import React, {
+  useCallback,
+  useState,
+  useRef,
+  FC,
+  useEffect,
+  useTransition,
+} from "react";
+import {
+  Node,
+  Edge,
+  NodeChange,
+  EdgeChange,
+  MarkerType,
+  applyNodeChanges,
+} from "reactflow";
 import {
   FlowEditor,
   TriggerNode,
@@ -147,6 +161,9 @@ const ZapEditor: FC = () => {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Add the React concurrent mode transition hook
+  const [isPending, startTransition] = useTransition();
+
   // Add state for the confirmation dialog
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [confirmDialogProps, setConfirmDialogProps] = useState({
@@ -249,22 +266,13 @@ const ZapEditor: FC = () => {
     nodeCountRef.current = counts;
   }, []);
 
+  // Find all instances of handleNodesChange and keep only the final version
   const handleNodesChange = useCallback((changes: NodeChange[]) => {
-    setNodes((nds) => {
-      return changes.reduce((acc: Node[], change) => {
-        if (change.type === "position" && change.position && change.id) {
-          return acc.map((node) =>
-            node.id === change.id
-              ? {
-                  ...node,
-                  position: change.position as { x: number; y: number },
-                }
-              : node
-          );
-        }
-        return acc;
-      }, nds);
-    });
+    // Only handle select changes, filter out all position changes
+    const selectChanges = changes.filter((c) => c.type === "select");
+    if (selectChanges.length > 0) {
+      setNodes((nds) => applyNodeChanges(selectChanges, nds));
+    }
   }, []);
 
   const handleEdgesChange = useCallback((changes: EdgeChange[]) => {

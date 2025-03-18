@@ -80,9 +80,11 @@ const TriggerNode = memo(
     return (
       <div
         ref={nodeRef}
-        className={`px-0 py-0 shadow-lg rounded-lg bg-purple-900 border ${
-          data.isSelected ? "border-purple-400" : "border-purple-700"
-        } min-w-[280px]`}
+        className={`relative bg-purple-900 border-2 ${
+          data.isSelected
+            ? "border-purple-400"
+            : "border-purple-700 hover:border-purple-600"
+        } rounded-lg shadow-lg min-w-[280px]`}
       >
         {/* No target handle for trigger nodes since they're always first */}
 

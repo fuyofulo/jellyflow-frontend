@@ -82,9 +82,11 @@ const ActionNode = memo(
     return (
       <div
         ref={nodeRef}
-        className={`px-0 py-0 shadow-lg rounded-lg bg-zinc-800 border ${
-          data.isSelected ? "border-yellow-500" : "border-zinc-700"
-        } min-w-[280px]`}
+        className={`relative bg-zinc-800 border-2 ${
+          data.isSelected
+            ? "border-yellow-500"
+            : "border-zinc-700 hover:border-zinc-500"
+        } rounded-lg shadow-lg w-64`}
       >
         <Handle
           type="target"
