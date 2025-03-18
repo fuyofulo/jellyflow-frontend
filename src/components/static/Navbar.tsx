@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Button1 } from "../ui/buttons/Button1";
-import { Button2 } from "../ui/buttons/Button2";
-import { Button7 } from "../ui/buttons/Button7";
+import { Button1 } from "../buttons/Button1";
+import { Button2 } from "../buttons/Button2";
+import { Button7 } from "../buttons/Button7";
 
 export const Navbar = () => {
   return (

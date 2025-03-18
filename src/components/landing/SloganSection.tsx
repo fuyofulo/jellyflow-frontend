@@ -1,5 +1,5 @@
 "use client";
-import { ColourfulText } from "../text/ColorfulText";
+import { ColourfulText } from "../stuff/ColorfulText";
 
 export const SloganSection = () => {
   return (

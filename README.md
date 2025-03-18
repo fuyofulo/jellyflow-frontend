@@ -1,4 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Zap Frontend
+
+This is the frontend for the Zap application.
+
+## Environment Setup
+
+This application uses environment variables for configuration.
+
+### Required Environment Variables
+
+Create a `.env.local` file in the root directory with the following variables:
+
+```
+# Backend API URL (required)
+NEXT_PUBLIC_BACKEND_URL=http://localhost:3033
+```
+
+For production environments, make sure to set the production URL in your deployment platform.
+
+### Development Setup
+
+1. Clone the repository
+2. Install dependencies:
+   ```
+   npm install
+   ```
+3. Create a `.env.local` file with the required environment variables
+4. Run the development server:
+   ```
+   npm run dev
+   ```
+5. Open [http://localhost:3000](http://localhost:3000) in your browser
+
+### Production Builds
+
+To create a production build:
+
+```
+npm run build
+npm start
+```
 
 ## Getting Started
 

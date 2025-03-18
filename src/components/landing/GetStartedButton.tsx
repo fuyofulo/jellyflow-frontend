@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import Link from "next/link";
-import { ButtonWithIcon } from "../ui/buttons/ButtonWithIcon";
+import { ButtonWithIcon } from "../buttons/ButtonWithIcon";
 import GoogleSVG from "../logos/GoogleSVG";
 import MailSVG from "../logos/MailSVG";
 
