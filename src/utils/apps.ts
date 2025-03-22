@@ -1,25 +1,32 @@
+import { AvailableAction, AvailableTrigger } from "./api/availableServices";
+
 export interface App {
   id: string;
   name: string;
   description: string;
   category: "trigger" | "action";
+  // Optional fields for icons
+  icon?: string;
+  iconComponent?: React.ComponentType<any>;
 }
 
-export const apps: App[] = [
+// This is a legacy list that will be replaced by dynamic services
+// It serves as a fallback in case services can't be loaded from the backend
+export const fallbackApps: App[] = [
   {
-    id: "aac0e619-2094-4589-badc-fe487834f705",
+    id: "webhook",
     name: "Webhook",
     description: "Trigger your flow with a webhook request",
     category: "trigger",
   },
   {
-    id: "7fbe85fc-5a12-4103-8d00-264f117aaf37",
+    id: "slack",
     name: "Slack",
     description: "Send messages and interact with Slack",
     category: "action",
   },
   {
-    id: "f7d609d1-0adf-4487-b934-2a6b9f5ea88f",
+    id: "github",
     name: "GitHub",
     description: "Automate your GitHub workflows",
     category: "action",
@@ -31,37 +38,37 @@ export const apps: App[] = [
     category: "action",
   },
   {
-    id: "d7f14946-bd36-4daa-9dca-2bbea2cb19b8",
+    id: "solana",
     name: "Solana",
     description: "Interact with Solana blockchain",
     category: "action",
   },
   {
-    id: "103b134a-4dac-46a3-a4c3-621e9ffcfd79",
+    id: "ethereum",
     name: "Ethereum",
     description: "Execute transactions on Ethereum blockchain",
     category: "action",
   },
   {
-    id: "9549c50b-81b1-47c3-b0e0-754fd8c7acf8",
+    id: "x",
     name: "X",
     description: "Post and interact with X (formerly Twitter)",
     category: "action",
   },
   {
-    id: "51368c2c-47aa-4999-be7e-5e8dc354c87f",
+    id: "notion",
     name: "Notion",
     description: "Create and update Notion pages",
     category: "action",
   },
   {
-    id: "f14c5d53-4563-41a2-9cdb-fcf5d184deda",
+    id: "drive",
     name: "Drive",
     description: "Manage files in Google Drive",
     category: "action",
   },
   {
-    id: "9a4793d2-3125-4ed1-9da2-0499edb6bdd0",
+    id: "chatgpt",
     name: "ChatGPT",
     description: "Generate text using OpenAI's ChatGPT",
     category: "action",
@@ -73,9 +80,69 @@ export const apps: App[] = [
     category: "action",
   },
   {
-    id: "f4b74660-98e4-46b3-856a-1b4b1423c722",
+    id: "email",
     name: "Email",
     description: "Send and receive emails",
     category: "action",
   },
 ];
+
+// Start with the fallback list
+export let apps: App[] = [...fallbackApps];
+
+/**
+ * Update the apps list with data from the backend
+ * This converts AvailableAction and AvailableTrigger objects to App objects
+ */
+export const updateApps = (
+  actions: AvailableAction[],
+  triggers: AvailableTrigger[]
+) => {
+  // If we don't have any backend data, keep using the fallbacks
+  if (actions.length === 0 && triggers.length === 0) {
+    console.log("[apps] No backend services available, using fallbacks.");
+    return;
+  }
+
+  const newApps: App[] = [];
+
+  // Convert triggers to App objects
+  triggers.forEach((trigger) => {
+    const app: App = {
+      id: trigger.id,
+      name: capitalize(trigger.name),
+      description: `${trigger.name} trigger for your workflow`,
+      category: "trigger",
+    };
+    newApps.push(app);
+    console.log(`[apps] Added trigger app: ${app.id} (${app.name})`);
+  });
+
+  // Convert actions to App objects
+  actions.forEach((action) => {
+    const app: App = {
+      id: action.id,
+      name: capitalize(action.name),
+      description: `${action.name} action for your workflow`,
+      category: "action",
+    };
+    newApps.push(app);
+    console.log(`[apps] Added action app: ${app.id} (${app.name})`);
+  });
+
+  // If we have backend data but for some reason it's empty,
+  // include the fallbacks to ensure we always have something to show
+  if (newApps.length === 0) {
+    console.log("[apps] Backend returned empty data, adding fallbacks");
+    newApps.push(...fallbackApps);
+  }
+
+  // Update the apps array
+  apps = newApps;
+  console.log(`[apps] Updated apps list with ${apps.length} items`);
+};
+
+// Helper to capitalize first letter of a string
+function capitalize(str: string): string {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}

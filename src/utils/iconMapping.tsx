@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import ChatGPTSVG from "../components/logos/ChatGPTSVG";
 import { DriveSVG } from "../components/logos/DriveSVG";
 import { EthereumSVG } from "../components/logos/EthereumSVG";
@@ -9,9 +9,14 @@ import MailSVG from "../components/logos/MailSVG";
 import { NotionSVG } from "../components/logos/NotionSVG";
 import { SlackSVG } from "../components/logos/SlackSVG";
 import { SolanaSVG } from "../components/logos/SolanaSVG";
-import { WebhookSVG } from "../components/logos/WebhookSVG";
+import WebhookSVG from "../components/logos/WebhookSVG";
 import { XSVG } from "../components/logos/XSVG";
 import { IconWrapper } from "../components/IconWrapper";
+import {
+  fetchAvailableActions,
+  fetchAvailableTriggers,
+  normalizeServiceName,
+} from "./api/availableServices";
 
 // Interface for the action type
 export interface ActionType {
@@ -55,31 +60,87 @@ export const IconMapping: Record<string, IconComponent> = {
   solana: SolanaSVG,
 };
 
-// Map of UUID actionIds to their corresponding SVG component keys
-// This maps the backend UUID to the key in the IconMapping
-export const ActionIdMapping: Record<string, string> = {
-  // Real UUIDs from the backend
-  "103b134a-4dac-46a3-a4c3-621e9ffcfd79": "ethereum",
-  "d7f14946-bd36-4daa-9dca-2bbea2cb19b8": "solana",
-  "7fbe85fc-5a12-4103-8d00-264f117aaf37": "slack",
-  "f14c5d53-4563-41a2-9cdb-fcf5d184deda": "google-drive",
-  "aac0e619-2094-4589-badc-fe487834f705": "webhook",
-  "f7d609d1-0adf-4487-b934-2a6b9f5ea88f": "github",
-  "9549c50b-81b1-47c3-b0e0-754fd8c7acf8": "x",
-  "51368c2c-47aa-4999-be7e-5e8dc354c87f": "notion",
-  "9a4793d2-3125-4ed1-9da2-0499edb6bdd0": "chatgpt",
-  discord: "discord", // Handle string ID for Discord
-  "f4b74660-98e4-46b3-856a-1b4b1423c722": "email",
-  gmail: "gmail", // Handle string ID for Gmail
+// Dynamic ActionIdMapping that will be populated from the backend
+export let ActionIdMapping: Record<string, string> = {};
 
-  // Keep some of the previous mappings as fallbacks
-  "1f4bf980-1811-4b70-bc93-aa4da7f5071b": "email",
-  "2e5a8930-3922-5c81-dc04-bb5eb8f6182c": "gmail",
-  "3f6ca041-4a33-6d92-ed15-cc6fc9f7293d": "chatgpt",
-  "4g7db152-5b44-7e03-fe26-dd7gd0g8304e": "twitter",
-  "5h8ec263-6c55-8f14-gf37-ee8he1h9415f": "x",
-  "6i9fd374-7d66-9g25-hg48-ff9if2i0526g": "github",
-  "7j0ge485-8e77-0h36-ih59-gg0jg3j1637h": "notion",
+// Initialize the mapping with some fallback values
+// This will be updated with real values from the backend at runtime
+const initializeActionIdMapping = () => {
+  // Default fallbacks, will be overwritten with backend data
+  ActionIdMapping = {
+    // These are just placeholders for initial rendering and will be replaced
+    webhook: "webhook",
+    github: "github",
+    gmail: "gmail",
+    slack: "slack",
+    discord: "discord",
+    "google-drive": "drive",
+    drive: "drive",
+    chatgpt: "chatgpt",
+    ethereum: "ethereum",
+    solana: "solana",
+    notion: "notion",
+    twitter: "x",
+    x: "x",
+    email: "email",
+    // Add common UUIDs for services we know about
+    "f4b74660-98e4-46b3-856a-1b4b1423c722": "email",
+    "7fbe85fc-5a12-4103-8d00-264f117aaf37": "slack",
+    "103b134a-4dac-46a3-a4c3-621e9ffcfd79": "ethereum",
+  };
+};
+
+// Initialize with defaults
+initializeActionIdMapping();
+
+/**
+ * Fetches available actions and triggers from the backend and updates the ActionIdMapping
+ * This should be called on application initialization
+ */
+export const initializeServicesFromBackend = async () => {
+  try {
+    console.log("[IconMapping] Initializing services from backend...");
+
+    // Fetch available actions and triggers
+    const [actions, triggers] = await Promise.all([
+      fetchAvailableActions(),
+      fetchAvailableTriggers(),
+    ]);
+
+    // Create a new mapping from the fetched data
+    const newMapping: Record<string, string> = {};
+
+    // Add actions to the mapping
+    actions.forEach((action) => {
+      const normalizedName = normalizeServiceName(action.name);
+      newMapping[action.id] = normalizedName;
+      console.log(
+        `[IconMapping] Mapped action: ${action.id} -> ${normalizedName}`
+      );
+    });
+
+    // Add triggers to the mapping
+    triggers.forEach((trigger) => {
+      const normalizedName = normalizeServiceName(trigger.name);
+      newMapping[trigger.id] = normalizedName;
+      console.log(
+        `[IconMapping] Mapped trigger: ${trigger.id} -> ${normalizedName}`
+      );
+    });
+
+    // Update the global ActionIdMapping
+    ActionIdMapping = {
+      ...ActionIdMapping, // Keep any existing mappings
+      ...newMapping, // Add new mappings from backend
+    };
+
+    console.log("[IconMapping] Services initialized:", ActionIdMapping);
+
+    return true;
+  } catch (error) {
+    console.error("[IconMapping] Failed to initialize services:", error);
+    return false;
+  }
 };
 
 /**
@@ -182,24 +243,94 @@ export const ActionIcon: React.FC<ActionIconProps> = ({
   height = 24,
   className = "text-yellow-600",
 }) => {
+  // Debug: Log the attempts to get an icon
+  console.log(
+    `[ActionIcon] Attempting to get icon for: ID=${
+      actionId || "no-id"
+    } / Name=${actionName || "no-name"}`
+  );
+
   let IconComponent = null;
   let customIcon = null;
 
   // First try using actionId if provided
   if (actionId) {
-    IconComponent = getIconByActionId(actionId);
+    // Try direct lookup first (most common case for well-known services)
+    IconComponent = IconMapping[actionId.toLowerCase()];
+
+    if (IconComponent) {
+      console.log(`[ActionIcon] Found icon directly for ID: ${actionId}`);
+    } else {
+      // Try UUID mapping
+      const iconKey = ActionIdMapping[actionId];
+      if (iconKey && IconMapping[iconKey]) {
+        IconComponent = IconMapping[iconKey];
+        console.log(
+          `[ActionIcon] Found icon via UUID mapping: ${actionId} -> ${iconKey}`
+        );
+      }
+
+      // Try fuzzy matching with normalized id
+      if (!IconComponent) {
+        const normalizedActionId = actionId.toLowerCase();
+
+        // Try all icon mappings to find a partial match
+        for (const [key, component] of Object.entries(IconMapping)) {
+          if (
+            normalizedActionId.includes(key) ||
+            key.includes(normalizedActionId)
+          ) {
+            IconComponent = component;
+            console.log(
+              `[ActionIcon] Found icon via fuzzy ID match: ${actionId} -> ${key}`
+            );
+            break;
+          }
+        }
+      }
+    }
+
     // If no icon found, try service-specific rendering
     if (!IconComponent) {
       customIcon = getServiceSpecificIcon(actionId);
+      if (customIcon) {
+        console.log(
+          `[ActionIcon] Using service-specific icon for ID: ${actionId}`
+        );
+      }
     }
   }
 
   // If not found and actionName is provided, try using actionName
   if (!IconComponent && !customIcon && actionName) {
-    IconComponent = getIconByActionName(actionName);
-    // If still no icon found, try service-specific rendering with action name
-    if (!IconComponent) {
-      customIcon = getServiceSpecificIcon(actionName);
+    const normalizedName = actionName.toLowerCase();
+
+    // Try direct match with keys
+    IconComponent = IconMapping[normalizedName];
+
+    if (IconComponent) {
+      console.log(`[ActionIcon] Found icon directly for name: ${actionName}`);
+    } else {
+      // Try finding a key that's contained in the name
+      for (const [key, component] of Object.entries(IconMapping)) {
+        if (normalizedName.includes(key) || key.includes(normalizedName)) {
+          IconComponent = component;
+          console.log(
+            `[ActionIcon] Found icon via fuzzy name match: ${actionName} -> ${key}`
+          );
+          break;
+        }
+      }
+
+      // If still no icon found, try service-specific rendering with action name
+      if (!IconComponent) {
+        customIcon = getServiceSpecificIcon(actionName);
+        if (customIcon) {
+          console.log(
+            `[ActionIcon] Using service-specific icon for name: ${actionName}`
+          );
+        }
+      }
     }
   }
 
@@ -212,16 +343,25 @@ export const ActionIcon: React.FC<ActionIconProps> = ({
   }
 
   if (!IconComponent) {
+    // Debug when no icon is found
+    console.log(
+      `[ActionIcon] No icon found for: ID=${actionId} / Name=${actionName}`
+    );
+
     // Create initial-based icon for services without icons
     let initial = "";
     if (actionName) {
       initial = actionName.charAt(0).toUpperCase();
     } else if (actionId) {
-      // Handle cases like 'discord', 'gmail', etc.
-      if (actionId === "discord") {
+      // Handle specific cases
+      if (actionId.toLowerCase().includes("discord")) {
         initial = "D";
-      } else if (actionId === "gmail") {
+      } else if (actionId.toLowerCase().includes("gmail")) {
         initial = "G";
+      } else if (actionId.toLowerCase().includes("slack")) {
+        initial = "S";
+      } else if (actionId.toLowerCase().includes("webhook")) {
+        initial = "W";
       } else {
         // Extract meaningful part from UUID if possible
         const parts = actionId.split("-");
@@ -260,4 +400,39 @@ export const ActionIcon: React.FC<ActionIconProps> = ({
       className={className}
     />
   );
+};
+
+/**
+ * Hook to initialize services when the component mounts
+ * Usage:
+ * ```
+ * const MyComponent = () => {
+ *   useInitializeServices();
+ *   // rest of component...
+ * }
+ * ```
+ */
+export const useInitializeServices = () => {
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  useEffect(() => {
+    if (!isInitialized) {
+      console.log("[IconMapping] Starting service initialization...");
+      initializeServicesFromBackend()
+        .then((success) => {
+          console.log(
+            `[IconMapping] Service initialization ${
+              success ? "completed" : "failed"
+            }`
+          );
+          setIsInitialized(success);
+        })
+        .catch((error) => {
+          console.error("[IconMapping] Error during initialization:", error);
+          setIsInitialized(false);
+        });
+    }
+  }, [isInitialized]);
+
+  return isInitialized;
 };

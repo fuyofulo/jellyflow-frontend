@@ -7,6 +7,7 @@ import React, {
   FC,
   useEffect,
   useTransition,
+  useMemo,
 } from "react";
 import {
   Node,
@@ -25,10 +26,18 @@ import {
 } from "../flow-editor";
 import { Modal } from "../ui/Modal";
 import { AppCard } from "../ui/AppCard";
-import { apps, App } from "@/utils/apps";
+import { apps, updateApps } from "@/utils/apps";
 import { buildApiUrl, API_ENDPOINTS } from "@/utils/api";
 import { getToken, isAuthenticated, getAuthHeaders } from "@/utils/auth";
 import { useRouter } from "next/navigation";
+import { useInitializeServices } from "@/utils/iconMapping";
+import {
+  fetchAvailableActions,
+  fetchAvailableTriggers,
+  AvailableAction,
+  AvailableTrigger,
+} from "@/utils/api/availableServices";
+import { v4 as uuidv4 } from "uuid";
 
 // Node types for React Flow
 const nodeTypes = {
@@ -41,40 +50,6 @@ const initialNodes: Node[] = [];
 
 // Initial edges for testing
 const initialEdges: Edge[] = [];
-
-// Sample actions for quick access
-const quickActions = [
-  {
-    id: "aac0e619-2094-4589-badc-fe487834f705",
-    name: "Webhook",
-    category: "Triggers",
-  },
-  {
-    id: "f4b74660-98e4-46b3-856a-1b4b1423c722",
-    name: "Email",
-    category: "Actions",
-  },
-  {
-    id: "7fbe85fc-5a12-4103-8d00-264f117aaf37",
-    name: "Slack",
-    category: "Actions",
-  },
-  {
-    id: "103b134a-4dac-46a3-a4c3-621e9ffcfd79",
-    name: "Ethereum",
-    category: "Actions",
-  },
-  {
-    id: "f14c5d53-4563-41a2-9cdb-fcf5d184deda",
-    name: "Drive",
-    category: "Actions",
-  },
-  {
-    id: "9a4793d2-3125-4ed1-9da2-0499edb6bdd0",
-    name: "ChatGPT",
-    category: "Actions",
-  },
-];
 
 // Add this interface near the top of the file after imports
 interface ZapData {
@@ -89,6 +64,17 @@ interface ZapData {
 
 // Add a constant for the localStorage key
 const LOCAL_STORAGE_KEY = "zap_draft_data";
+
+// Function to get default trigger ID - moved to top level
+const getDefaultTriggerId = (availableTriggers: AvailableTrigger[]): string => {
+  // If we already have triggers from the backend, use the first one
+  if (availableTriggers.length > 0) {
+    return availableTriggers[0].id;
+  }
+
+  // Otherwise use a placeholder that will be replaced when data is loaded
+  return "webhook";
+};
 
 // Custom confirmation dialog component
 const ConfirmDialog: FC<{
@@ -151,7 +137,7 @@ const ZapEditor: FC = () => {
   // Add this state for structured data
   const [zapData, setZapData] = useState<ZapData>({
     zapName: "Untitled Zap",
-    availableTriggerId: "aac0e619-2094-4589-badc-fe487834f705", // Default trigger ID
+    availableTriggerId: getDefaultTriggerId([]), // Use dynamic ID
     triggerMetadata: {},
     actions: [],
   });
@@ -172,31 +158,135 @@ const ZapEditor: FC = () => {
     onConfirm: () => {},
   });
 
+  // Initialize services from backend
+  useInitializeServices();
+
+  // State for available actions and triggers from backend
+  const [availableActions, setAvailableActions] = useState<AvailableAction[]>(
+    []
+  );
+  const [availableTriggers, setAvailableTriggers] = useState<
+    AvailableTrigger[]
+  >([]);
+
+  // Load available actions and triggers from backend
+  useEffect(() => {
+    const loadServices = async () => {
+      try {
+        const [actions, triggers] = await Promise.all([
+          fetchAvailableActions(),
+          fetchAvailableTriggers(),
+        ]);
+
+        // Update available actions and triggers
+        setAvailableActions(actions);
+        setAvailableTriggers(triggers);
+
+        // Update apps list
+        updateApps(actions, triggers);
+
+        // Log to verify we have data
+        console.log("Loaded services:", { actions, triggers });
+      } catch (error) {
+        console.error("Failed to load services:", error);
+      }
+    };
+
+    loadServices();
+  }, []);
+
+  // Combine available actions and triggers for the quick actions panel
+  const quickActions = useMemo(() => {
+    // Transform triggers to the expected format
+    const formattedTriggers = availableTriggers.map((trigger) => ({
+      id: trigger.id,
+      name: trigger.name.charAt(0).toUpperCase() + trigger.name.slice(1), // Capitalize first letter
+      category: "Triggers",
+    }));
+
+    // Transform actions to the expected format
+    const formattedActions = availableActions.map((action) => ({
+      id: action.id,
+      name: action.name.charAt(0).toUpperCase() + action.name.slice(1), // Capitalize first letter
+      category: "Actions",
+    }));
+
+    // If no actions or triggers are available yet, provide fallbacks
+    if (formattedTriggers.length === 0 && formattedActions.length === 0) {
+      return [
+        {
+          id: "webhook",
+          name: "Webhook",
+          category: "Triggers",
+        },
+        {
+          id: "email",
+          name: "Email",
+          category: "Actions",
+        },
+        {
+          id: "slack",
+          name: "Slack",
+          category: "Actions",
+        },
+      ];
+    }
+
+    // Combine triggers and actions
+    return [...formattedTriggers, ...formattedActions];
+  }, [availableTriggers, availableActions]);
+
   // Filter apps based on search term and category
   const filteredTriggers = React.useMemo(() => {
-    const triggers = apps.filter((app) => app.category === "trigger");
-    if (!searchTerm.trim()) return triggers;
+    // Start with the backend triggers if available
+    let allTriggers = availableTriggers.map((trigger) => ({
+      id: trigger.id,
+      name: trigger.name.charAt(0).toUpperCase() + trigger.name.slice(1),
+      description: `${trigger.name} trigger for your workflow`,
+      category: "trigger",
+    }));
+
+    // If no backend triggers, fall back to the apps array
+    if (allTriggers.length === 0) {
+      allTriggers = apps.filter((app) => app.category === "trigger");
+    }
+
+    // Apply search filtering
+    if (!searchTerm.trim()) return allTriggers;
 
     const term = searchTerm.toLowerCase();
-    return triggers.filter(
+    return allTriggers.filter(
       (app) =>
         app.name.toLowerCase().includes(term) ||
-        app.description.toLowerCase().includes(term)
+        (app.description && app.description.toLowerCase().includes(term))
     );
-  }, [searchTerm]);
+  }, [searchTerm, availableTriggers, apps]);
 
   const filteredActions = React.useMemo(() => {
-    const actions = apps.filter((app) => app.category === "action");
-    if (!searchTerm.trim()) return actions;
+    // Start with the backend actions if available
+    let allActions = availableActions.map((action) => ({
+      id: action.id,
+      name: action.name.charAt(0).toUpperCase() + action.name.slice(1),
+      description: `${action.name} action for your workflow`,
+      category: "action",
+    }));
+
+    // If no backend actions, fall back to the apps array
+    if (allActions.length === 0) {
+      allActions = apps.filter((app) => app.category === "action");
+    }
+
+    // Apply search filtering
+    if (!searchTerm.trim()) return allActions;
 
     const term = searchTerm.toLowerCase();
-    return actions.filter(
+    return allActions.filter(
       (app) =>
         app.name.toLowerCase().includes(term) ||
-        app.description.toLowerCase().includes(term) ||
+        (app.description && app.description.toLowerCase().includes(term)) ||
         app.category.toLowerCase().includes(term)
     );
-  }, [searchTerm]);
+  }, [searchTerm, availableActions, apps]);
 
   // Helper function to get the ordered nodes based on connections
   const getOrderedNodes = useCallback(() => {
@@ -615,15 +705,43 @@ const ZapEditor: FC = () => {
   };
 
   const handleAppSelect = (appId: string) => {
-    if (!selectedNodeId) return;
+    console.log("App selected:", appId);
+
+    if (!selectedNodeId) {
+      console.error("No selected node ID when selecting app");
+      return;
+    }
 
     // Find the parent node
     const parentNode = nodes.find((node) => node.id === selectedNodeId);
-    if (!parentNode) return;
+    if (!parentNode) {
+      console.error("Parent node not found:", selectedNodeId);
+      return;
+    }
 
-    // Find the app details
-    const app = apps.find((app) => app.id === appId);
-    if (!app) return;
+    // Find the app details first in availableActions
+    let app = availableActions.find((action) => action.id === appId);
+    let appData;
+
+    if (app) {
+      // Convert from AvailableAction to App format
+      appData = {
+        id: app.id,
+        name: app.name.charAt(0).toUpperCase() + app.name.slice(1),
+        description: `${app.name} action`,
+        category: "action",
+      };
+      console.log("Using backend action data:", appData);
+    } else {
+      // Fall back to apps array
+      appData = apps.find((a) => a.id === appId);
+      if (!appData) {
+        console.error("App not found:", appId);
+        return;
+      }
+    }
+
+    console.log("Found app data:", appData);
 
     // Find the next node in the flow (if any)
     const childEdge = edges.find((edge) => edge.source === selectedNodeId);
@@ -644,14 +762,16 @@ const ZapEditor: FC = () => {
     // Create new node
     const newNode: Node = {
       id: `${appId}-${Date.now()}`,
-      type: app.category === "trigger" ? "trigger" : "action",
+      type: appData.category === "trigger" ? "trigger" : "action",
       position: newNodePosition,
       data: {
-        label: app.name,
-        actionId: app.id,
-        actionName: app.name,
+        label: appData.name,
+        actionId: appData.id,
+        actionName: appData.name,
       },
     };
+
+    console.log("Creating new node:", newNode);
 
     // Create edge from parent to new node
     const newEdge1: Edge = {
@@ -719,9 +839,9 @@ const ZapEditor: FC = () => {
     setZapData((prev) => {
       const updatedActions = [...prev.actions];
       const newAction = {
-        availableActionId: app.id, // Use the app ID directly
+        availableActionId: appData.id, // Use the app ID directly
         actionMetadata: {
-          message: app.name,
+          message: appData.name,
         },
       };
 
@@ -760,9 +880,42 @@ const ZapEditor: FC = () => {
   };
 
   const handleTriggerSelect = (triggerId: string) => {
-    // Find the trigger app
-    const triggerApp = apps.find((app) => app.id === triggerId);
-    if (!triggerApp) return;
+    console.log("Trigger selected:", triggerId);
+    console.log("Available triggers:", availableTriggers);
+    console.log("Available actions:", availableActions);
+    console.log("Apps:", apps);
+
+    // Find the trigger app in availableTriggers first (backend data)
+    const backendTrigger = availableTriggers.find(
+      (trigger) => trigger.id === triggerId
+    );
+
+    // If not found in backend data, try to find in the apps array
+    let triggerApp = apps.find((app) => app.id === triggerId);
+
+    if (!triggerApp && backendTrigger) {
+      // Create a temporary app object from the backend trigger
+      triggerApp = {
+        id: backendTrigger.id,
+        name:
+          backendTrigger.name.charAt(0).toUpperCase() +
+          backendTrigger.name.slice(1),
+        description: `${backendTrigger.name} trigger`,
+        category: "trigger",
+      };
+      console.log("Using backend trigger data:", triggerApp);
+    }
+
+    if (!triggerApp) {
+      console.error("Trigger app not found for ID:", triggerId);
+      // Create a fallback trigger app to avoid getting stuck
+      triggerApp = {
+        id: triggerId,
+        name: "Webhook",
+        description: "Webhook trigger",
+        category: "trigger",
+      };
+    }
 
     // Create a new trigger node at a centered position
     const newTriggerNode: Node = {
@@ -776,6 +929,8 @@ const ZapEditor: FC = () => {
       },
     };
 
+    console.log("Creating new trigger node:", newTriggerNode);
+
     // Clear existing nodes and start with just the new trigger
     setNodes([newTriggerNode]);
     setEdges([]);
@@ -783,7 +938,7 @@ const ZapEditor: FC = () => {
     // Update zapData
     setZapData({
       zapName: zapName,
-      availableTriggerId: triggerId, // Use the actual selected trigger ID
+      availableTriggerId: triggerId,
       triggerMetadata: { message: triggerApp.name },
       actions: [],
     });
@@ -1097,7 +1252,7 @@ const ZapEditor: FC = () => {
         setZapName("Untitled Zap");
         setZapData({
           zapName: "Untitled Zap",
-          availableTriggerId: "aac0e619-2094-4589-badc-fe487834f705",
+          availableTriggerId: getDefaultTriggerId([]),
           triggerMetadata: {},
           actions: [],
         });
@@ -1112,6 +1267,33 @@ const ZapEditor: FC = () => {
     });
     setShowConfirmDialog(true);
   }, [clearLocalStorageDraft]);
+
+  // Add this useEffect to update zapData.availableTriggerId when availableTriggers changes
+  useEffect(() => {
+    if (availableTriggers.length > 0) {
+      setZapData((prevData) => ({
+        ...prevData,
+        availableTriggerId: getDefaultTriggerId(availableTriggers),
+      }));
+    }
+  }, [availableTriggers]);
+
+  // Add this at the beginning of the component to track renders
+  useEffect(() => {
+    console.log("ZapEditor rendering with:", {
+      showTriggerModal,
+      filteredTriggers: filteredTriggers.length,
+      showAppModal,
+      availableTriggers: availableTriggers.length,
+      availableActions: availableActions.length,
+    });
+  }, [
+    showTriggerModal,
+    filteredTriggers,
+    showAppModal,
+    availableTriggers,
+    availableActions,
+  ]);
 
   return (
     <div className="flex flex-col h-[85vh] bg-zinc-950 overflow-hidden">
@@ -1415,7 +1597,14 @@ const ZapEditor: FC = () => {
                       <AppCard
                         key={app.id}
                         app={app}
-                        onClick={() => handleTriggerSelect(app.id)}
+                        onClick={() => {
+                          console.log(
+                            "Trigger card clicked:",
+                            app.id,
+                            app.name
+                          );
+                          handleTriggerSelect(app.id);
+                        }}
                       />
                     ))
                   ) : (
