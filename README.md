@@ -2,8 +2,6 @@
 
 Jellyflow is a powerful no-code workflow automation platform that allows users to create and customize automation workflows by connecting various services with triggers and actions. Similar to platforms like Zapier and IFTTT, Jellyflow enables seamless integration between your favorite apps and services without requiring coding knowledge.
 
-![Jellyflow Platform](https://placehold.co/600x400?text=Jellyflow+Platform) <!-- Replace with actual screenshot -->
-
 ## 🚀 Features
 
 - **Intuitive Flow Editor**: Visual canvas for designing workflows with a drag-and-drop interface
