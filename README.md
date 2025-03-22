@@ -1,76 +1,125 @@
-# Zap Frontend
+# Jellyflow - No-Code Workflow Automation Platform
 
-This is the frontend for the Zap application.
+Jellyflow is a powerful no-code workflow automation platform that allows users to create and customize automation workflows by connecting various services with triggers and actions. Similar to platforms like Zapier and IFTTT, Jellyflow enables seamless integration between your favorite apps and services without requiring coding knowledge.
 
-## Environment Setup
+![Jellyflow Platform](https://placehold.co/600x400?text=Jellyflow+Platform) <!-- Replace with actual screenshot -->
 
-This application uses environment variables for configuration.
+## 🚀 Features
 
-### Required Environment Variables
+- **Intuitive Flow Editor**: Visual canvas for designing workflows with a drag-and-drop interface
+- **Triggers & Actions**: Support for various triggers (webhooks, scheduled events, email) and actions (API calls, notifications, database operations)
+- **Service Integrations**: Connect with popular services like Slack, Gmail, Discord, GitHub, and more
+- **Custom Webhooks**: Create webhook endpoints to trigger your workflows from external services
+- **Real-time Execution**: Execute workflows in real-time with detailed logs
+- **Error Handling**: Built-in error management and retry capabilities
+- **Dynamic Data Mapping**: Map data between different services with ease
 
-Create a `.env.local` file in the root directory with the following variables:
+## 🏗️ Tech Stack
 
-```
-# Backend API URL (required)
-NEXT_PUBLIC_BACKEND_URL=http://localhost:3033
-```
+- **Frontend**: Next.js 15, React 19, TypeScript
+- **UI Components**: Tailwind CSS, Radix UI
+- **Flow Editor**: React Flow for node-based interface
+- **API Client**: Custom fetch wrapper for backend communication
 
-For production environments, make sure to set the production URL in your deployment platform.
+## 🛠️ Getting Started
 
-### Development Setup
+### Prerequisites
 
-1. Clone the repository
-2. Install dependencies:
+- Node.js 18.x or higher
+- npm 9.x or higher
+- Access to the Jellyflow backend API (separate repository)
+
+### Installation
+
+1. Clone the repository:
+
+   ```bash
+   git clone https://github.com/fuyofulo/jellyflow-frontend.git
+   cd jellyflow-frontend
    ```
+
+2. Install dependencies:
+
+   ```bash
    npm install
    ```
-3. Create a `.env.local` file with the required environment variables
-4. Run the development server:
+
+3. Create a `.env.local` file in the root directory with the following variables:
+
    ```
+   # Backend API URL (required)
+   NEXT_PUBLIC_BACKEND_URL=http://localhost:3033
+   ```
+
+4. Start the development server:
+
+   ```bash
    npm run dev
    ```
-5. Open [http://localhost:3000](http://localhost:3000) in your browser
 
-### Production Builds
+5. Open [http://localhost:3000](http://localhost:3000) in your browser to access the application.
+
+### Production Deployment
 
 To create a production build:
 
-```
+```bash
 npm run build
 npm start
 ```
 
-## Getting Started
+For production deployment, we recommend using Vercel or a similar platform that supports Next.js applications.
 
-First, run the development server:
+## 🧩 Project Structure
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+jellyflow-frontend/
+├── public/              # Static assets
+├── src/
+│   ├── app/             # Next.js app router pages
+│   ├── components/      # React components
+│   │   ├── flow-editor/ # Flow editor components
+│   │   ├── logos/       # Service logo components
+│   │   ├── pages/       # Page-specific components
+│   │   └── ui/          # Reusable UI components
+│   ├── data/            # Static data and configurations
+│   └── utils/           # Utility functions and API clients
+├── .env.local           # Local environment variables
+└── package.json         # Project dependencies and scripts
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🌐 Key Workflows
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Creating a New Automation
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Navigate to the dashboard and click "Create New Jellyflow"
+2. Add a trigger from the available trigger services
+3. Configure the trigger settings
+4. Add one or more actions to execute when the trigger fires
+5. Configure each action with the necessary settings
+6. Test the workflow using the built-in testing tools
+7. Activate the workflow to put it into production
 
-## Learn More
+### Managing Workflows
 
-To learn more about Next.js, take a look at the following resources:
+- View all your workflows from the dashboard
+- Enable/disable workflows as needed
+- View execution history and logs
+- Edit existing workflows to modify triggers or actions
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🧪 Development
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Command Reference
 
-## Deploy on Vercel
+- `npm run dev` - Start the development server
+- `npm run build` - Build the application for production
+- `npm start` - Start the production server
+- `npm run lint` - Run ESLint to check for code issues
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 🔗 Related Projects
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [Jellyflow Backend](https://github.com/fuyofulo/jellyflow) - The API server for Jellyflow
+
+---
+
+Built with ❤️ by fuyofulo
