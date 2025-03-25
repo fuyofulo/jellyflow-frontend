@@ -181,38 +181,49 @@ const Dashboard = () => {
         // Use real API
         const token = getToken();
         if (!token) {
-          // Instead of redirecting, just show an error
           setError("Authentication token missing. Toggle action failed.");
           return;
         }
+
         const response = await fetch(
           buildApiUrl(API_ENDPOINTS.ZAP_TOGGLE(id)),
           {
             method: "POST",
-            headers: getAuthHeaders(false), // Pass false to omit "Bearer" prefix
+            headers: getAuthHeaders(false),
             body: JSON.stringify({
               isActive: !currentStatus,
             }),
           }
         );
+
         if (!response.ok) {
-          // Just log the error instead of redirecting
+          if (response.status === 401) {
+            setError("Authentication failed. Please sign in again.");
+            return;
+          }
+          if (response.status === 404) {
+            setError("Zap not found. It may have been deleted.");
+            return;
+          }
           throw new Error("Failed to toggle zap status");
         }
+
+        const data = await response.json();
+
+        // Update local state with the returned zap data
+        setZaps((prevZaps) =>
+          prevZaps.map((zap) =>
+            zap.id === id ? { ...zap, isActive: data.zap.isActive } : zap
+          )
+        );
       }
-      // Update local state
-      setZaps((prevZaps) =>
-        prevZaps.map((zap) =>
-          zap.id === id ? { ...zap, isActive: !currentStatus } : zap
-        )
-      );
     } catch (error) {
       console.error("Error toggling zap:", error);
-      setError("Failed to update zap status. Please try again.");
-      // Remove this handleAuthError call to prevent redirect
-      // if (!USE_MOCK_DATA) {
-      //   handleAuthError(error, router);
-      // }
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Failed to update zap status. Please try again."
+      );
     }
   };
 
@@ -315,7 +326,7 @@ const Dashboard = () => {
   };
 
   // Renders flow steps as SVG icons based on action types
-  const renderFlow = (actions: Action[]) => {
+  const renderFlow = (actions: Action[], trigger: any) => {
     // Sort actions by sorting order
     const sortedActions = [...actions].sort(
       (a, b) => a.sortingOrder - b.sortingOrder
@@ -325,6 +336,38 @@ const Dashboard = () => {
     const hasMoreSteps = sortedActions.length > 5;
     return (
       <div className="flex items-center space-x-4">
+        {/* Add trigger logo if it exists */}
+        {trigger && (
+          <div
+            className="flex items-center justify-center"
+            title={trigger.type?.name || "Trigger"}
+          >
+            <ActionIcon
+              actionId={trigger.AvailableTriggerId}
+              actionName={trigger.type?.name || "Trigger"}
+              width={28}
+              height={28}
+            />
+          </div>
+        )}
+        {/* Add arrow after trigger if there are actions */}
+        {trigger && displayedSteps.length > 0 && (
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            className="text-gray-400"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M9 5l7 7-7 7"
+            />
+          </svg>
+        )}
         {displayedSteps.map((action, index) => (
           <React.Fragment key={action.id}>
             {index > 0 && (
@@ -383,6 +426,11 @@ const Dashboard = () => {
         )}
       </div>
     );
+  };
+
+  // Function to navigate to the zap editor page to edit a zap
+  const handleEditZap = (id: string) => {
+    router.push(`/edit/${id}`);
   };
 
   if (loading) {
@@ -496,7 +544,7 @@ const Dashboard = () => {
                   Running
                 </th>
                 <th className="px-6 py-5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider font-mono">
-                  Go
+                  Zap Runs
                 </th>
               </tr>
             </thead>
@@ -537,13 +585,18 @@ const Dashboard = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300 flex items-center">
                       {zap.actions && zap.actions.length > 0 ? (
-                        renderFlow(zap.actions)
+                        renderFlow(zap.actions, zap.trigger)
                       ) : (
                         <span className="text-gray-500 italic">No actions</span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300 font-mono">
-                      {zap.zapName}
+                      <button
+                        onClick={() => handleEditZap(zap.id)}
+                        className="hover:text-yellow-600 transition-colors"
+                      >
+                        {zap.zapName}
+                      </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300 font-mono">
                       {formatDate(zap.lastEdited)}
@@ -563,10 +616,11 @@ const Dashboard = () => {
                       <button
                         onClick={() => handleGoToZap(zap.id)}
                         className="text-yellow-600 hover:text-yellow-500"
+                        title="View Zap Runs"
                       >
                         <svg
-                          width="24"
-                          height="24"
+                          width="20"
+                          height="20"
                           viewBox="0 0 24 24"
                           fill="none"
                           stroke="currentColor"

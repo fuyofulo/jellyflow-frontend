@@ -105,25 +105,38 @@ const Signup = () => {
         }),
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Error response:", errorText);
-
-        let errorMessage;
-        try {
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.message || "Failed to create account";
-        } catch (e) {
-          errorMessage = "Server error. Please try again later.";
-        }
-
-        throw new Error(errorMessage);
-      }
-
       const data = await response.json();
 
-      // Redirect to signin page on successful signup
-      router.push("/signin");
+      // Handle different status codes from the backend
+      if (response.status === 409) {
+        // User already exists
+        throw new Error(data.message || "User with this email already exists");
+      } else if (response.status === 201) {
+        // User created successfully
+        console.log("Signup successful:", data);
+
+        // Show success message and redirect
+        setTimeout(() => {
+          router.push("/signin?newAccount=true");
+        }, 1000);
+
+        // Use a more user-friendly way to notify user of success
+        const successDiv = document.createElement("div");
+        successDiv.className =
+          "mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative";
+        successDiv.textContent =
+          "Account created successfully! Redirecting to login page...";
+
+        // Insert success message at the top of the form
+        const formElement = document.querySelector("form");
+        if (formElement && formElement.parentNode) {
+          formElement.parentNode.insertBefore(successDiv, formElement);
+        }
+      } else if (!response.ok) {
+        // Handle other error responses
+        const errorMessage = data.message || "Failed to create account";
+        throw new Error(errorMessage);
+      }
     } catch (error) {
       setApiError(error instanceof Error ? error.message : "An error occurred");
       console.error("Signup error:", error);

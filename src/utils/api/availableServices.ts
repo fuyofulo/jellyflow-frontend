@@ -1,4 +1,4 @@
-import { BACKEND_URL } from "@/config";
+import { buildApiUrl, API_ENDPOINTS } from "@/utils/api";
 
 export interface AvailableTrigger {
   id: string;
@@ -16,7 +16,7 @@ export interface AvailableAction {
  */
 export const fetchAvailableTriggers = async (): Promise<AvailableTrigger[]> => {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/v1/trigger/available`);
+    const response = await fetch(buildApiUrl(API_ENDPOINTS.AVAILABLE_TRIGGERS));
 
     if (!response.ok) {
       throw new Error(`Failed to fetch available triggers: ${response.status}`);
@@ -36,7 +36,7 @@ export const fetchAvailableTriggers = async (): Promise<AvailableTrigger[]> => {
  */
 export const fetchAvailableActions = async (): Promise<AvailableAction[]> => {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/v1/action/available`);
+    const response = await fetch(buildApiUrl(API_ENDPOINTS.AVAILABLE_ACTIONS));
 
     if (!response.ok) {
       throw new Error(`Failed to fetch available actions: ${response.status}`);

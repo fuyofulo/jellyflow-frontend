@@ -83,25 +83,26 @@ const Signin = () => {
         body: JSON.stringify(formData),
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Error response:", errorText);
-
-        let errorMessage;
-        try {
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.message || "Invalid credentials";
-        } catch (e) {
-          errorMessage = "Server error. Please try again later.";
-        }
-
-        throw new Error(errorMessage);
-      }
-
       const data = await response.json();
+
+      // Handle different response status codes
+      if (response.status === 401) {
+        // Invalid credentials (password doesn't match)
+        throw new Error(data.message || "Invalid username or password");
+      } else if (response.status === 403) {
+        // User not found
+        throw new Error(data.message || "User not found");
+      } else if (response.status === 411) {
+        // Invalid input format
+        throw new Error(data.message || "Invalid input format");
+      } else if (!response.ok) {
+        // Other errors
+        throw new Error(data.message || "Login failed");
+      }
 
       // Store token using our auth utility
       if (data.token) {
+        console.log("Login successful");
         setToken(data.token);
 
         // Redirect to dashboard on successful signin
@@ -115,15 +116,6 @@ const Signin = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // For development only: temporary login for testing
-  const handleDevLogin = () => {
-    // Sample token for development testing
-    const devToken =
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImVtYWlsIjoidGVzdEB0ZXN0LmNvbSIsImlhdCI6MTYxNjEyMzQ1Nn0.YourSignatureHere";
-    setToken(devToken);
-    router.push("/dashboard");
   };
 
   return (
@@ -232,17 +224,6 @@ const Signin = () => {
                 </button>
               </div>
             </form>
-
-            {process.env.NODE_ENV === "development" && (
-              <div className="mt-4">
-                <button
-                  onClick={handleDevLogin}
-                  className="w-full flex justify-center py-2 px-4 border border-zinc-700 rounded-md shadow-sm text-sm font-mono text-gray-300 bg-zinc-800 hover:bg-zinc-700 focus:outline-none"
-                >
-                  Development: Skip Login
-                </button>
-              </div>
-            )}
 
             <div className="mt-6">
               <div className="relative">

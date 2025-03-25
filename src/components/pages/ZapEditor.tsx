@@ -62,9 +62,6 @@ interface ZapData {
   }[];
 }
 
-// Add a constant for the localStorage key
-const LOCAL_STORAGE_KEY = "zap_draft_data";
-
 // Function to get default trigger ID - moved to top level
 const getDefaultTriggerId = (availableTriggers: AvailableTrigger[]): string => {
   // If we already have triggers from the backend, use the first one
@@ -114,7 +111,18 @@ const ConfirmDialog: FC<{
   );
 };
 
-const ZapEditor: FC = () => {
+// Update the interface for Props
+interface ZapEditorProps {
+  isEditMode?: boolean;
+  zapId?: string;
+  initialZapData?: any;
+}
+
+const ZapEditor: FC<ZapEditorProps> = ({
+  isEditMode = false,
+  zapId = "",
+  initialZapData = null,
+}) => {
   const router = useRouter();
   const [nodes, setNodes] = useState<Node[]>(initialNodes);
   const [edges, setEdges] = useState<Edge[]>(initialEdges);
@@ -158,6 +166,9 @@ const ZapEditor: FC = () => {
     onConfirm: () => {},
   });
 
+  // Add this near the other state declarations
+  const [isClearing, setIsClearing] = useState(false);
+
   // Initialize services from backend
   useInitializeServices();
 
@@ -168,6 +179,115 @@ const ZapEditor: FC = () => {
   const [availableTriggers, setAvailableTriggers] = useState<
     AvailableTrigger[]
   >([]);
+
+  // Initialize editor with existing zap data if in edit mode
+  useEffect(() => {
+    if (isEditMode && initialZapData) {
+      console.log("Initializing editor with zap data:", initialZapData);
+
+      // Set the zap name
+      setZapName(initialZapData.zapName || "Untitled Zap");
+
+      // Initialize nodes and edges
+      const newNodes: Node[] = [];
+      const newEdges: Edge[] = [];
+
+      // Add trigger node if it exists
+      if (initialZapData.trigger) {
+        const triggerId = "trigger";
+        const triggerNode: Node = {
+          id: triggerId,
+          type: "trigger",
+          position: { x: 250, y: 50 },
+          data: {
+            label: initialZapData.zapName || "Webhook Trigger",
+            actionId: initialZapData.AvailableTriggerId,
+            actionName: initialZapData.trigger.type?.name || "Webhook",
+            metadata: initialZapData.trigger.metadata?.message || "",
+            onRename: (newName: string) => handleRenameNode(triggerId, newName),
+            onDelete: () => handleDeleteNode(triggerId),
+            onAddNodeBelow: handleAddNodeBelow,
+            isSelected: triggerId === activeNodeId,
+          },
+        };
+        newNodes.push(triggerNode);
+      }
+
+      // Add action nodes with increased spacing
+      if (initialZapData.actions && initialZapData.actions.length > 0) {
+        const sortedActions = [...initialZapData.actions].sort(
+          (a, b) => a.sortingOrder - b.sortingOrder
+        );
+
+        let previousNodeId = "trigger";
+
+        sortedActions.forEach((action, index) => {
+          const actionId = `action-${index}`;
+          const yPosition = 250 + index * 200; // Changed from 200 to 250 to account for trigger at y=50
+
+          const actionNode: Node = {
+            id: actionId,
+            type: "action",
+            position: { x: 250, y: yPosition },
+            data: {
+              number: index + 1,
+              label: action.type?.name || `Action ${index + 1}`,
+              actionId: action.actionId,
+              actionName: action.type?.name || `Action ${index + 1}`,
+              metadata: action.metadata?.message || "",
+              onRename: (newName: string) =>
+                handleRenameNode(actionId, newName),
+              onDelete: () => handleDeleteNode(actionId),
+              onDuplicate: () => handleDuplicateNode(actionId),
+              onAddNodeBelow: handleAddNodeBelow,
+              isSelected: actionId === activeNodeId,
+            },
+          };
+          newNodes.push(actionNode);
+
+          // Create edge connecting to previous node
+          if (previousNodeId) {
+            const edgeId = `e${previousNodeId}-${actionId}`;
+            const edge: Edge = {
+              id: edgeId,
+              source: previousNodeId,
+              target: actionId,
+              type: "smoothstep",
+              markerEnd: {
+                type: MarkerType.ArrowClosed,
+                width: 20,
+                height: 20,
+                color: "#888",
+              },
+              style: {
+                strokeWidth: 2,
+                stroke: "#888",
+              },
+            };
+            newEdges.push(edge);
+          }
+
+          previousNodeId = actionId;
+        });
+      }
+
+      // Set the nodes and edges
+      setNodes(newNodes);
+      setEdges(newEdges);
+
+      // Set the zapData with the initial values
+      setZapData({
+        zapName: initialZapData.zapName || "Untitled Zap",
+        availableTriggerId: initialZapData.AvailableTriggerId,
+        triggerMetadata: initialZapData.trigger?.metadata || {},
+        actions:
+          initialZapData.actions?.map((action: any) => ({
+            availableActionId: action.actionId,
+            actionMetadata: action.metadata || {},
+          })) || [],
+      });
+    }
+  }, [isEditMode, initialZapData]);
 
   // Load available actions and triggers from backend
   useEffect(() => {
@@ -576,8 +696,7 @@ const ZapEditor: FC = () => {
         id: `${actionId}-${nodeCountRef.current[actionId]}`,
         position: {
           x: nodeToClone.position.x,
-          // Position it below the existing node with some offset
-          y: nodeToClone.position.y + 150,
+          y: nodeToClone.position.y + 150, // Position it below the existing node with some offset
         },
       };
 
@@ -753,10 +872,10 @@ const ZapEditor: FC = () => {
       (node) => node.id === selectedNodeId
     );
 
-    // Create new node position (200 pixels below parent)
+    // Create new node position (increase spacing from 200 to 300 pixels below parent)
     const newNodePosition = {
       x: parentNode.position.x,
-      y: parentNode.position.y + 200,
+      y: parentNode.position.y + 200, // Keep at 200px for consistency
     };
 
     // Create new node
@@ -809,7 +928,7 @@ const ZapEditor: FC = () => {
           !(edge.source === selectedNodeId && edge.target === childNodeId)
       );
 
-      // Shift all nodes below the insertion point down
+      // Shift all nodes below the insertion point down with increased spacing
       updatedNodes = nodes.map((node) => {
         // If this node is below the parent node, shift it down
         if (node.position.y > parentNode.position.y && node.id !== newNode.id) {
@@ -865,8 +984,6 @@ const ZapEditor: FC = () => {
         title: "Create New Flow",
         message: "Starting a new flow will clear your current work. Continue?",
         onConfirm: () => {
-          // Clear the localStorage draft
-          clearLocalStorageDraft();
           // Show the trigger selection modal to start a new flow
           setShowTriggerModal(true);
           setShowConfirmDialog(false);
@@ -917,11 +1034,11 @@ const ZapEditor: FC = () => {
       };
     }
 
-    // Create a new trigger node at a centered position
+    // Create a new trigger node at a centered position with more initial spacing
     const newTriggerNode: Node = {
       id: `${triggerId}-${Date.now()}`,
       type: "trigger",
-      position: { x: 250, y: 100 },
+      position: { x: 250, y: 100 }, // Center trigger node at y=100
       data: {
         label: triggerApp.name,
         actionId: triggerId,
@@ -1045,84 +1162,54 @@ const ZapEditor: FC = () => {
     }
   };
 
-  // Load saved data from localStorage on component mount
-  useEffect(() => {
-    try {
-      const savedData = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (savedData) {
-        const parsedData = JSON.parse(savedData);
-
-        // Restore zap name
-        if (parsedData.zapName) {
-          setZapName(parsedData.zapName);
-        }
-
-        // Restore nodes and edges if they exist
-        if (parsedData.nodes && parsedData.nodes.length > 0) {
-          setNodes(parsedData.nodes);
-        }
-
-        if (parsedData.edges && parsedData.edges.length > 0) {
-          setEdges(parsedData.edges);
-        }
-
-        // Restore zapData
-        if (parsedData.zapData) {
-          setZapData(parsedData.zapData);
-        }
-
-        // Set last saved time if available
-        if (parsedData.lastModified) {
-          const date = new Date(parsedData.lastModified);
-          const formattedTime = `${date.getHours()}:${date
-            .getMinutes()
-            .toString()
-            .padStart(2, "0")}`;
-          setLastSaved(formattedTime);
-        }
-
-        console.log("Restored data from localStorage:", parsedData);
-      }
-    } catch (error) {
-      console.error("Error loading data from localStorage:", error);
-    }
-  }, []);
-
-  // Save zap data to localStorage whenever it changes
-  useEffect(() => {
-    try {
-      // Skip saving if there are no nodes (empty flow)
-      if (nodes.length === 0) return;
-
-      const now = new Date();
-      const lastModified = now.toISOString();
-      const formattedTime = `${now.getHours()}:${now
-        .getMinutes()
-        .toString()
-        .padStart(2, "0")}`;
-      setLastSaved(formattedTime);
-
-      const dataToSave = {
-        zapName,
-        nodes,
-        edges,
-        zapData,
-        lastModified,
-      };
-
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dataToSave));
-      console.log("Saved data to localStorage");
-    } catch (error) {
-      console.error("Error saving data to localStorage:", error);
-    }
-  }, [zapName, nodes, edges, zapData]);
-
   // Function to clear localStorage draft
   const clearLocalStorageDraft = useCallback(() => {
-    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    // No longer storing drafts in localStorage
   }, []);
 
-  // Function to save the zap to the backend
+  // Update the clearDraft function
+  const clearDraft = useCallback(() => {
+    setConfirmDialogProps({
+      title: "Clear Draft",
+      message:
+        "Are you sure you want to clear your current work? This cannot be undone.",
+      onConfirm: async () => {
+        setIsClearing(true);
+        try {
+          // Reset editor state
+          setNodes([]);
+          setEdges([]);
+          setZapName("Untitled Zap");
+          setZapData({
+            zapName: "Untitled Zap",
+            availableTriggerId: getDefaultTriggerId([]),
+            triggerMetadata: {},
+            actions: [],
+          });
+
+          // Reset other state values
+          setIsEditingMetadata(false);
+          setSelectedNode(null);
+          setActiveNodeId(null);
+          setSelectedNodeId(null);
+          setShowConfirmDialog(false);
+
+          // Show success message
+          setSaveSuccess(true);
+          setTimeout(() => setSaveSuccess(false), 3000);
+        } catch (error) {
+          console.error("Error clearing draft:", error);
+          setSaveError("Failed to clear draft. Please try again.");
+          setTimeout(() => setSaveError(null), 3000);
+        } finally {
+          setIsClearing(false);
+        }
+      },
+    });
+    setShowConfirmDialog(true);
+  }, []);
+
+  // Update the saveZapToBackend function to show better feedback
   const saveZapToBackend = async () => {
     try {
       setIsSaving(true);
@@ -1154,10 +1241,6 @@ const ZapEditor: FC = () => {
       // Map trigger ID to ensure it's a valid UUID
       const mappedTriggerId = mapActionIdToBackendId(triggerNode.data.actionId);
 
-      // Log for debugging
-      console.log("Original trigger ID:", triggerNode.data.actionId);
-      console.log("Mapped trigger ID:", mappedTriggerId);
-
       // Format the data according to the backend requirements
       const payload = {
         zapName: zapName,
@@ -1166,14 +1249,7 @@ const ZapEditor: FC = () => {
           message: triggerNode.data.metadata || "",
         },
         actions: actionNodes.map((node) => {
-          // Map each action ID to ensure it's a valid UUID
           const mappedActionId = mapActionIdToBackendId(node.data.actionId);
-
-          // Log for debugging
-          console.log("Node:", node.id);
-          console.log("Original action ID:", node.data.actionId);
-          console.log("Mapped action ID:", mappedActionId);
-
           return {
             availableActionId: mappedActionId,
             actionMetadata: {
@@ -1183,46 +1259,64 @@ const ZapEditor: FC = () => {
         }),
       };
 
-      console.log(
-        "Sending payload to backend:",
-        JSON.stringify(payload, null, 2)
-      );
+      let response;
 
-      // Make the API call using the auth headers utility
-      const response = await fetch(buildApiUrl(API_ENDPOINTS.ZAP_CREATE), {
-        method: "POST",
-        headers: getAuthHeaders(false), // Pass false to omit "Bearer" prefix
-        body: JSON.stringify(payload),
-      });
+      if (isEditMode) {
+        // Update existing zap
+        response = await fetch(buildApiUrl(API_ENDPOINTS.ZAP_EDIT(zapId)), {
+          method: "POST",
+          headers: getAuthHeaders(false),
+          body: JSON.stringify(payload),
+        });
+      } else {
+        // Create new zap
+        response = await fetch(buildApiUrl(API_ENDPOINTS.ZAP_CREATE), {
+          method: "POST",
+          headers: getAuthHeaders(false),
+          body: JSON.stringify(payload),
+        });
+      }
 
       if (!response.ok) {
-        // Handle different error status codes
         if (response.status === 401) {
           router.push("/signin");
           throw new Error("Authentication failed. Please log in again.");
         }
 
         const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.message || "Failed to create the zap";
-        console.error("Backend error:", errorData);
+        const errorMessage =
+          errorData.message ||
+          (isEditMode
+            ? "Failed to update the zap"
+            : "Failed to create the zap");
         throw new Error(errorMessage);
       }
-
-      // Success - clear localStorage draft since it's now saved to backend
-      clearLocalStorageDraft();
 
       // Success - show notification
       setSaveSuccess(true);
 
-      // Hide success message after 3 seconds
+      // Show different messages based on mode
+      const successMessage = isEditMode
+        ? "Zap updated successfully!"
+        : "Zap created successfully!";
+      console.log(successMessage);
+
+      // Hide success message and redirect after 3 seconds
       setTimeout(() => {
         setSaveSuccess(false);
+        if (isEditMode) {
+          router.push("/dashboard");
+        }
       }, 3000);
     } catch (error) {
-      console.error("Error creating zap:", error);
+      console.error(
+        isEditMode ? "Error updating zap:" : "Error creating zap:",
+        error
+      );
       setSaveError(
         error instanceof Error ? error.message : "An unknown error occurred"
       );
+      setTimeout(() => setSaveError(null), 3000);
     } finally {
       setIsSaving(false);
     }
@@ -1235,38 +1329,6 @@ const ZapEditor: FC = () => {
       zapName: zapName,
     }));
   }, [zapName]);
-
-  // Function to clear the current draft completely
-  const clearDraft = useCallback(() => {
-    setConfirmDialogProps({
-      title: "Clear Draft",
-      message:
-        "Are you sure you want to clear your current work? This cannot be undone.",
-      onConfirm: () => {
-        // Clear localStorage
-        clearLocalStorageDraft();
-
-        // Reset editor state
-        setNodes([]);
-        setEdges([]);
-        setZapName("Untitled Zap");
-        setZapData({
-          zapName: "Untitled Zap",
-          availableTriggerId: getDefaultTriggerId([]),
-          triggerMetadata: {},
-          actions: [],
-        });
-
-        // Reset other state values
-        setIsEditingMetadata(false);
-        setSelectedNode(null);
-        setActiveNodeId(null);
-        setSelectedNodeId(null);
-        setShowConfirmDialog(false);
-      },
-    });
-    setShowConfirmDialog(true);
-  }, [clearLocalStorageDraft]);
 
   // Add this useEffect to update zapData.availableTriggerId when availableTriggers changes
   useEffect(() => {
@@ -1295,6 +1357,27 @@ const ZapEditor: FC = () => {
     availableActions,
   ]);
 
+  // Add effect to update lastSaved timestamp when flow changes
+  useEffect(() => {
+    // Skip if there are no nodes (empty flow)
+    if (nodes.length === 0) return;
+
+    // Update the last saved indicator with current time
+    const now = new Date();
+    const formattedTime = `${now.getHours()}:${now
+      .getMinutes()
+      .toString()
+      .padStart(2, "0")}`;
+
+    // This now tracks "last modified" time rather than "last saved to localStorage"
+    setLastSaved(formattedTime);
+  }, [zapName, nodes, edges]);
+
+  // Return to dashboard
+  const handleCancelEdit = () => {
+    router.push("/dashboard");
+  };
+
   return (
     <div className="flex flex-col h-[85vh] bg-zinc-950 overflow-hidden">
       {/* Header */}
@@ -1322,83 +1405,23 @@ const ZapEditor: FC = () => {
                 className="mr-1"
               >
                 <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
+                <path d="M12 6v6l4 2" />
               </svg>
-              Draft saved at {lastSaved}
+              <span>Last saved: {lastSaved}</span>
             </div>
           )}
         </div>
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={clearDraft}
-            className="px-4 py-1.5 bg-red-800/50 text-white font-mono font-bold rounded hover:bg-red-700/70 transition-colors"
-          >
-            Clear Draft
-          </button>
-          <button
-            onClick={handleCreateFlow}
-            className="px-4 py-1.5 bg-purple-600 text-white font-mono font-bold rounded hover:bg-purple-500 transition-colors"
-          >
-            New Flow
-          </button>
-          <div className="flex items-center">
-            {/* Feedback messages */}
-            {saveSuccess && (
-              <div className="mr-4 py-1 px-3 bg-green-900/30 border border-green-700 rounded text-green-400 text-sm flex items-center">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="mr-1.5"
-                >
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                </svg>
-                Zap created successfully!
-              </div>
-            )}
-
-            {saveError && (
-              <div className="mr-4 py-1 px-3 bg-red-900/30 border border-red-700 rounded text-red-400 text-sm flex items-center">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="mr-1.5"
-                >
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <line x1="12" y1="8" x2="12" y2="12"></line>
-                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                </svg>
-                {saveError}
-              </div>
-            )}
-
+        <div className="flex space-x-2">
+          {!isEditMode && (
             <button
-              onClick={saveZapToBackend}
-              disabled={isSaving || nodes.length === 0}
-              className={`px-4 py-1.5 bg-yellow-600 text-black font-mono font-bold rounded flex items-center ${
-                isSaving || nodes.length === 0
-                  ? "opacity-50 cursor-not-allowed"
-                  : "hover:bg-yellow-500"
-              } transition-colors`}
+              className="px-4 py-2 border border-red-500 bg-zinc-800 text-red-500 rounded-md font-mono font-medium hover:bg-red-500/10 transition-colors flex items-center"
+              onClick={clearDraft}
+              disabled={isClearing || isSaving}
             >
-              {isSaving ? (
+              {isClearing ? (
                 <>
                   <svg
-                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-black"
+                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-red-500"
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
                     viewBox="0 0 24 24"
@@ -1417,33 +1440,72 @@ const ZapEditor: FC = () => {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     ></path>
                   </svg>
-                  Creating...
+                  Clearing...
                 </>
               ) : (
-                <>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="mr-2"
-                  >
-                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                    <polyline points="17 21 17 13 7 13 7 21" />
-                    <polyline points="7 3 7 8 15 8" />
-                  </svg>
-                  Create Zap
-                </>
+                "Clear Zap"
               )}
             </button>
-          </div>
+          )}
+          {isEditMode && (
+            <button
+              className="px-4 py-2 border border-gray-600 bg-zinc-800 text-gray-300 rounded-md font-mono font-medium hover:bg-zinc-700 transition-colors"
+              onClick={handleCancelEdit}
+              disabled={isSaving || isClearing}
+            >
+              Cancel
+            </button>
+          )}
+          <button
+            className="px-4 py-2 bg-yellow-600 text-black rounded-md font-mono font-bold hover:bg-yellow-500 transition-colors flex items-center"
+            onClick={saveZapToBackend}
+            disabled={isSaving || isClearing}
+          >
+            {isSaving ? (
+              <>
+                <svg
+                  className="animate-spin -ml-1 mr-2 h-4 w-4 text-black"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                {isEditMode ? "Updating..." : "Creating..."}
+              </>
+            ) : (
+              <>{isEditMode ? "Update Zap" : "Create Zap"}</>
+            )}
+          </button>
         </div>
       </div>
+
+      {/* Success/Error Messages */}
+      {(saveSuccess || saveError) && (
+        <div
+          className={`fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
+            saveSuccess ? "bg-green-500" : "bg-red-500"
+          } text-white font-mono`}
+        >
+          {saveSuccess
+            ? isEditMode
+              ? "Zap updated successfully!"
+              : "Zap created successfully!"
+            : saveError}
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
