@@ -40,6 +40,14 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import ConfirmationDialog from "../ui/ConfirmationDialog";
 
+// Define the App interface
+interface App {
+  id: string;
+  name: string;
+  description: string;
+  category: "trigger" | "action";
+}
+
 // Node types for React Flow
 const nodeTypes = {
   action: ActionNode,
@@ -98,7 +106,7 @@ const ConfirmDialog: FC<{
             onClick={onClose}
             className="px-4 py-2 bg-zinc-800 text-zinc-300 font-medium rounded hover:bg-zinc-700 transition-colors"
           >
-            Cancel
+            Go to Dashboard
           </button>
           <button
             onClick={onConfirm}
@@ -120,7 +128,7 @@ interface ZapEditorProps {
 }
 
 const ZapEditor: FC<ZapEditorProps> = ({
-  isEditMode = false,
+  isEditMode: initialIsEditMode = false,
   zapId = "",
   initialZapData = null,
 }) => {
@@ -142,6 +150,7 @@ const ZapEditor: FC<ZapEditorProps> = ({
   const [isEditingMetadata, setIsEditingMetadata] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
+  const [isEditMode, setIsEditMode] = useState(initialIsEditMode);
 
   // Add this state for structured data
   const [zapData, setZapData] = useState<ZapData>({
@@ -181,9 +190,14 @@ const ZapEditor: FC<ZapEditorProps> = ({
 
   // Add this state for save dialog
   const [showSaveDialog, setShowSaveDialog] = useState(false);
-  const [saveDialogState, setSaveDialogState] = useState({
+  const [saveDialogState, setSaveDialogState] = useState<{
+    isSuccess: boolean;
+    isLoading: boolean;
+    newZapId?: string;
+  }>({
     isSuccess: false,
     isLoading: false,
+    newZapId: undefined,
   });
 
   // Initialize services from backend
@@ -373,19 +387,24 @@ const ZapEditor: FC<ZapEditorProps> = ({
     return [...formattedTriggers, ...formattedActions];
   }, [availableTriggers, availableActions]);
 
-  // Filter apps based on search term and category
+  // Update the filteredTriggers mapping
   const filteredTriggers = React.useMemo(() => {
     // Start with the backend triggers if available
     let allTriggers = availableTriggers.map((trigger) => ({
       id: trigger.id,
       name: trigger.name.charAt(0).toUpperCase() + trigger.name.slice(1),
       description: `${trigger.name} trigger for your workflow`,
-      category: "trigger",
+      category: "trigger" as const,
     }));
 
     // If no backend triggers, fall back to the apps array
     if (allTriggers.length === 0) {
-      allTriggers = apps.filter((app) => app.category === "trigger");
+      allTriggers = apps.filter((app) => app.category === "trigger") as Array<{
+        id: string;
+        name: string;
+        description: string;
+        category: "trigger";
+      }>;
     }
 
     // Apply search filtering
@@ -399,18 +418,24 @@ const ZapEditor: FC<ZapEditorProps> = ({
     );
   }, [searchTerm, availableTriggers, apps]);
 
+  // Update the filteredActions mapping
   const filteredActions = React.useMemo(() => {
     // Start with the backend actions if available
     let allActions = availableActions.map((action) => ({
       id: action.id,
       name: action.name.charAt(0).toUpperCase() + action.name.slice(1),
       description: `${action.name} action for your workflow`,
-      category: "action",
+      category: "action" as const,
     }));
 
     // If no backend actions, fall back to the apps array
     if (allActions.length === 0) {
-      allActions = apps.filter((app) => app.category === "action");
+      allActions = apps.filter((app) => app.category === "action") as Array<{
+        id: string;
+        name: string;
+        description: string;
+        category: "action";
+      }>;
     }
 
     // Apply search filtering
@@ -1235,32 +1260,26 @@ const ZapEditor: FC<ZapEditorProps> = ({
       setSaveDialogState({ isSuccess: false, isLoading: true });
       setShowSaveDialog(true);
 
-      // Get token directly to verify it exists
       const token = getToken();
 
-      // Check if user is logged in
       if (!token) {
         router.push("/signin");
         throw new Error("Please log in to create a zap");
       }
 
-      // Extract trigger node (first node)
       const triggerNode = nodes.find((node) => node.type === "trigger");
 
       if (!triggerNode) {
         throw new Error("No trigger node found in the flow");
       }
 
-      // Get ordered nodes (actions only)
       const orderedNodes = getOrderedNodes();
       const actionNodes = orderedNodes.filter(
         (node) => node.type !== "trigger"
       );
 
-      // Map trigger ID to ensure it's a valid UUID
       const mappedTriggerId = mapActionIdToBackendId(triggerNode.data.actionId);
 
-      // Format the data according to the backend requirements
       const payload = {
         zapName: zapName,
         availableTriggerId: mappedTriggerId,
@@ -1281,14 +1300,12 @@ const ZapEditor: FC<ZapEditorProps> = ({
       let response;
 
       if (isEditMode) {
-        // Update existing zap
         response = await fetch(buildApiUrl(API_ENDPOINTS.ZAP_EDIT(zapId)), {
           method: "POST",
           headers: getAuthHeaders(false),
           body: JSON.stringify(payload),
         });
       } else {
-        // Create new zap
         response = await fetch(buildApiUrl(API_ENDPOINTS.ZAP_CREATE), {
           method: "POST",
           headers: getAuthHeaders(false),
@@ -1311,7 +1328,15 @@ const ZapEditor: FC<ZapEditorProps> = ({
         throw new Error(errorMessage);
       }
 
-      setSaveDialogState((prev) => ({ ...prev, isSuccess: true }));
+      // Store the response data including the new zap ID
+      const responseData = await response.json();
+      const newZapId = responseData.zap?.id;
+
+      setSaveDialogState((prev) => ({
+        ...prev,
+        isSuccess: true,
+        newZapId: newZapId, // Store the new zap ID
+      }));
     } catch (error) {
       console.error(
         isEditMode ? "Error updating zap:" : "Error creating zap:",
@@ -1329,16 +1354,158 @@ const ZapEditor: FC<ZapEditorProps> = ({
 
   // Update the handleCloseSaveDialog function
   const handleCloseSaveDialog = useCallback(
-    (action?: "dashboard" | "stay") => {
+    async (action?: "dashboard" | "stay") => {
       if (saveDialogState.isSuccess) {
         if (action === "dashboard") {
           router.push("/dashboard");
         } else {
-          // Just close the dialog and stay on the editor
+          // If staying, and we just created a new zap, transition to edit mode
+          if (!isEditMode && saveDialogState.newZapId) {
+            try {
+              // Fetch the newly created zap details
+              const response = await fetch(
+                buildApiUrl(API_ENDPOINTS.ZAP_DETAIL(saveDialogState.newZapId)),
+                {
+                  headers: getAuthHeaders(false),
+                }
+              );
+
+              if (!response.ok) {
+                if (response.status === 401) {
+                  router.push("/signin");
+                  throw new Error(
+                    "Authentication failed. Please log in again."
+                  );
+                }
+                throw new Error("Failed to fetch new zap details");
+              }
+
+              const data = await response.json();
+              const zapData = data.zap; // The response includes the zap in a 'zap' property
+
+              if (!zapData) {
+                throw new Error("No zap data received from the server");
+              }
+
+              // Update the URL without triggering a navigation
+              window.history.pushState(
+                {},
+                "",
+                `/edit/${saveDialogState.newZapId}`
+              );
+
+              // Set edit mode and zap ID
+              setIsEditMode(true);
+              zapId = saveDialogState.newZapId;
+
+              // Initialize editor with the new zap data
+              const newNodes: Node[] = [];
+              const newEdges: Edge[] = [];
+
+              // Add trigger node if it exists
+              if (zapData.trigger) {
+                const triggerId = "trigger";
+                const triggerNode: Node = {
+                  id: triggerId,
+                  type: "trigger",
+                  position: { x: 250, y: 50 },
+                  data: {
+                    label: zapData.trigger.type?.name || "Webhook Trigger",
+                    actionId: zapData.AvailableTriggerId,
+                    actionName: zapData.trigger.type?.name || "Webhook",
+                    metadata: zapData.trigger.metadata?.message || "",
+                    onRename: (newName: string) =>
+                      handleRenameNode(triggerId, newName),
+                    onDelete: () => handleDeleteNode(triggerId),
+                    onAddNodeBelow: handleAddNodeBelow,
+                    isSelected: triggerId === activeNodeId,
+                  },
+                };
+                newNodes.push(triggerNode);
+              }
+
+              // Add action nodes with proper sorting
+              if (zapData.actions && zapData.actions.length > 0) {
+                const sortedActions = [...zapData.actions].sort(
+                  (a, b) => a.sortingOrder - b.sortingOrder
+                );
+
+                let previousNodeId = "trigger";
+                sortedActions.forEach((action, index) => {
+                  const actionId = `action-${index}`;
+                  const actionNode: Node = {
+                    id: actionId,
+                    type: "action",
+                    position: { x: 250, y: 250 + index * 200 },
+                    data: {
+                      number: index + 1,
+                      label: action.type?.name || `Action ${index + 1}`,
+                      actionId: action.actionId,
+                      actionName: action.type?.name || `Action ${index + 1}`,
+                      metadata: action.metadata?.message || "",
+                      onRename: (newName: string) =>
+                        handleRenameNode(actionId, newName),
+                      onDelete: () => handleDeleteNode(actionId),
+                      onDuplicate: () => handleDuplicateNode(actionId),
+                      onAddNodeBelow: handleAddNodeBelow,
+                      isSelected: actionId === activeNodeId,
+                    },
+                  };
+                  newNodes.push(actionNode);
+
+                  // Create edge connecting to previous node
+                  const edge: Edge = {
+                    id: `e${previousNodeId}-${actionId}`,
+                    source: previousNodeId,
+                    target: actionId,
+                    type: "smoothstep",
+                    markerEnd: {
+                      type: MarkerType.ArrowClosed,
+                      width: 20,
+                      height: 20,
+                      color: "#888",
+                    },
+                    style: {
+                      strokeWidth: 2,
+                      stroke: "#888",
+                    },
+                  };
+                  newEdges.push(edge);
+                  previousNodeId = actionId;
+                });
+              }
+
+              // Update the editor state
+              setNodes(newNodes);
+              setEdges(newEdges);
+
+              // Update zapData state
+              setZapData({
+                zapName: zapData.zapName || "Untitled Zap",
+                availableTriggerId: zapData.AvailableTriggerId,
+                triggerMetadata: zapData.trigger?.metadata || {},
+                actions:
+                  zapData.actions?.map((action: any) => ({
+                    availableActionId: action.actionId,
+                    actionMetadata: action.metadata || {},
+                  })) || [],
+              });
+            } catch (error) {
+              console.error("Error fetching new zap details:", error);
+              setSaveError(
+                error instanceof Error
+                  ? error.message
+                  : "Failed to load the new zap details"
+              );
+            }
+          }
+
+          // Close the dialog
           setShowSaveDialog(false);
           setSaveDialogState({
             isSuccess: false,
             isLoading: false,
+            newZapId: undefined,
           });
         }
       } else {
@@ -1347,10 +1514,18 @@ const ZapEditor: FC<ZapEditorProps> = ({
         setSaveDialogState({
           isSuccess: false,
           isLoading: false,
+          newZapId: undefined,
         });
       }
     },
-    [saveDialogState.isSuccess, router]
+    [
+      saveDialogState.isSuccess,
+      saveDialogState.newZapId,
+      router,
+      isEditMode,
+      zapId,
+      activeNodeId,
+    ]
   );
 
   // Update zapData.zapName when zapName changes
@@ -1570,10 +1745,10 @@ const ZapEditor: FC<ZapEditorProps> = ({
           {isEditMode && (
             <button
               className="px-4 py-2 border border-gray-600 bg-zinc-800 text-gray-300 rounded-md font-mono font-medium hover:bg-zinc-700 transition-colors"
-              onClick={handleCancelEdit}
+              onClick={() => router.push("/dashboard")}
               disabled={isSaving || isClearing || deleteDialogState.isLoading}
             >
-              Cancel
+              Go to Dashboard
             </button>
           )}
           <button
@@ -1677,7 +1852,7 @@ const ZapEditor: FC<ZapEditorProps> = ({
                     className="px-4 py-2 text-sm text-zinc-400 hover:text-white transition-colors"
                     onClick={() => setIsAddingNode(false)}
                   >
-                    Cancel
+                    Go to Dashboard
                   </button>
                 </div>
               </div>
@@ -1865,7 +2040,9 @@ const ZapEditor: FC<ZapEditorProps> = ({
         }
         onClose={() => handleCloseSaveDialog("stay")}
         confirmButtonText={saveDialogState.isSuccess ? "Go to Dashboard" : "OK"}
-        closeButtonText={saveDialogState.isSuccess ? "Stay Here" : "Cancel"}
+        closeButtonText={
+          saveDialogState.isSuccess ? "Stay Here" : "Go to Dashboard"
+        }
         showCloseButton={true}
       />
     </div>
