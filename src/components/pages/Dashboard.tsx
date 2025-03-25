@@ -15,6 +15,7 @@ import { ActionIcon } from "@/utils/iconMapping"; // For development, set to fal
 import { devOnly } from "@/utils/environment";
 import { useEnvironment } from "@/hooks/useEnvironment";
 import { buildApiUrl, API_ENDPOINTS } from "@/utils/api";
+import ConfirmationDialog from "../ui/ConfirmationDialog";
 
 // For development, set to false to use the real API
 const USE_MOCK_DATA = devOnly(false, false);
@@ -63,6 +64,13 @@ const Dashboard = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   // Count of selected zaps
   const selectedCount = Object.values(selectedZaps).filter(Boolean).length;
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteDialogState, setDeleteDialogState] = useState({
+    isSuccess: false,
+    isLoading: false,
+    zapId: "",
+    zapName: "",
+  });
 
   const fetchZaps = useCallback(async () => {
     setLoading(true);
@@ -288,13 +296,12 @@ const Dashboard = () => {
           const response = await fetch(
             buildApiUrl(API_ENDPOINTS.ZAP_DELETE(zapId)),
             {
-              method: "DELETE",
-              headers: getAuthHeaders(false), // Pass false to omit "Bearer" prefix
+              method: "POST", // Using POST as specified
+              headers: getAuthHeaders(false),
             }
           );
 
           if (!response.ok) {
-            // Instead of handling auth errors with redirect, just throw an error
             if (response.status === 401) {
               throw new Error("Authentication failed. Please try again.");
             }
@@ -433,6 +440,62 @@ const Dashboard = () => {
     router.push(`/edit/${id}`);
   };
 
+  // Add this function to handle single zap deletion
+  const handleDeleteZap = async (zapId: string, zapName: string) => {
+    setShowDeleteDialog(true);
+    setDeleteDialogState({
+      isSuccess: false,
+      isLoading: false,
+      zapId,
+      zapName,
+    });
+  };
+
+  // Update the delete confirmation logic
+  const handleConfirmDelete = async () => {
+    setDeleteDialogState((prev) => ({ ...prev, isLoading: true }));
+    try {
+      const response = await fetch(
+        buildApiUrl(API_ENDPOINTS.ZAP_DELETE(deleteDialogState.zapId)),
+        {
+          method: "POST",
+          headers: getAuthHeaders(false),
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Authentication failed. Please try again.");
+        }
+        throw new Error(`Failed to delete zap ${deleteDialogState.zapId}`);
+      }
+
+      setDeleteDialogState((prev) => ({ ...prev, isSuccess: true }));
+      await fetchZaps(); // Refresh the zaps list
+    } catch (error) {
+      console.error("Error deleting zap:", error);
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Failed to delete zap. Please try again."
+      );
+      setShowDeleteDialog(false);
+    } finally {
+      setDeleteDialogState((prev) => ({ ...prev, isLoading: false }));
+    }
+  };
+
+  // Add this function to handle dialog close
+  const handleCloseDeleteDialog = () => {
+    setShowDeleteDialog(false);
+    setDeleteDialogState({
+      isSuccess: false,
+      isLoading: false,
+      zapId: "",
+      zapName: "",
+    });
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex justify-center items-center">
@@ -470,7 +533,7 @@ const Dashboard = () => {
               value={searchQuery}
               onChange={handleSearchChange}
               placeholder="Search zaps..."
-              className="block w-full pl-10 py-2 border border-gray-700 rounded-md shadow-sm placeholder-gray-500 bg-zinc-800 text-white focus:outline-none focus:ring-yellow-600 focus:border-yellow-600 font-mono"
+              className="block w-full pl-10 py-2 border border-white rounded-md shadow-sm placeholder-white bg-black text-white focus:outline-none focus:ring-yellow-600 focus:border-yellow-600 font-mono"
             />
           </div>
           <div className="flex space-x-3">
@@ -521,7 +584,7 @@ const Dashboard = () => {
           <table className="min-w-full divide-y divide-gray-800">
             <thead>
               <tr>
-                <th className="px-4 py-5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider font-mono">
+                <th className="px-3 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider font-mono">
                   <label className="inline-flex items-center">
                     <input
                       type="checkbox"
@@ -531,20 +594,23 @@ const Dashboard = () => {
                     />
                   </label>
                 </th>
-                <th className="px-6 py-5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider font-mono">
+                <th className="px-4 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider font-mono">
                   Flow
                 </th>
-                <th className="px-6 py-5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider font-mono">
+                <th className="px-4 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider font-mono">
                   Name
                 </th>
-                <th className="px-6 py-5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider font-mono">
+                <th className="px-4 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider font-mono">
                   Last Edited
                 </th>
-                <th className="px-6 py-5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider font-mono">
+                <th className="px-4 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider font-mono">
                   Running
                 </th>
-                <th className="px-6 py-5 text-left text-xs font-medium text-gray-300 uppercase tracking-wider font-mono">
+                <th className="px-4 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider font-mono">
                   Zap Runs
+                </th>
+                <th className="px-4 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider font-mono">
+                  Delete
                 </th>
               </tr>
             </thead>
@@ -571,7 +637,7 @@ const Dashboard = () => {
                     key={zap.id}
                     className="hover:bg-zinc-800 transition-colors"
                   >
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-300">
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-300">
                       <label className="inline-flex items-center">
                         <input
                           type="checkbox"
@@ -583,14 +649,14 @@ const Dashboard = () => {
                         />
                       </label>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300 flex items-center">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300 flex items-center">
                       {zap.actions && zap.actions.length > 0 ? (
                         renderFlow(zap.actions, zap.trigger)
                       ) : (
                         <span className="text-gray-500 italic">No actions</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300 font-mono">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300 font-mono">
                       <button
                         onClick={() => handleEditZap(zap.id)}
                         className="hover:text-yellow-600 transition-colors"
@@ -598,10 +664,10 @@ const Dashboard = () => {
                         {zap.zapName}
                       </button>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300 font-mono">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300 font-mono">
                       {formatDate(zap.lastEdited)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300">
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input
                           type="checkbox"
@@ -612,7 +678,7 @@ const Dashboard = () => {
                         <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-yellow-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-black after:border-gray-600 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-yellow-600"></div>
                       </label>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300">
                       <button
                         onClick={() => handleGoToZap(zap.id)}
                         className="text-yellow-600 hover:text-yellow-500"
@@ -633,6 +699,27 @@ const Dashboard = () => {
                         </svg>
                       </button>
                     </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300">
+                      <button
+                        onClick={() => handleDeleteZap(zap.id, zap.zapName)}
+                        className="text-red-500 hover:text-red-400 transition-colors"
+                        title="Delete Zap"
+                      >
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -640,6 +727,21 @@ const Dashboard = () => {
           </table>
         </div>
       </div>
+
+      {/* Add the confirmation dialog */}
+      <ConfirmationDialog
+        isOpen={showDeleteDialog}
+        title={deleteDialogState.isSuccess ? "Success" : "Delete Zap"}
+        message={
+          deleteDialogState.isSuccess
+            ? "Zap has been deleted successfully!"
+            : `Are you sure you want to delete "${deleteDialogState.zapName}"? This action cannot be undone.`
+        }
+        isSuccess={deleteDialogState.isSuccess}
+        isLoading={deleteDialogState.isLoading}
+        onConfirm={handleConfirmDelete}
+        onClose={handleCloseDeleteDialog}
+      />
     </div>
   );
 };

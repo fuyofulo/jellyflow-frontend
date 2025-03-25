@@ -38,6 +38,7 @@ import {
   AvailableTrigger,
 } from "@/utils/api/availableServices";
 import { v4 as uuidv4 } from "uuid";
+import ConfirmationDialog from "../ui/ConfirmationDialog";
 
 // Node types for React Flow
 const nodeTypes = {
@@ -168,6 +169,22 @@ const ZapEditor: FC<ZapEditorProps> = ({
 
   // Add this near the other state declarations
   const [isClearing, setIsClearing] = useState(false);
+
+  // Add this new state for zap deletion
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteDialogState, setDeleteDialogState] = useState({
+    isSuccess: false,
+    isLoading: false,
+  });
+
+  // Add this state for save dialog
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [saveDialogState, setSaveDialogState] = useState({
+    isSuccess: false,
+    isLoading: false,
+  });
 
   // Initialize services from backend
   useInitializeServices();
@@ -1209,12 +1226,14 @@ const ZapEditor: FC<ZapEditorProps> = ({
     setShowConfirmDialog(true);
   }, []);
 
-  // Update the saveZapToBackend function to show better feedback
+  // Update the saveZapToBackend function
   const saveZapToBackend = async () => {
     try {
       setIsSaving(true);
       setSaveError(null);
       setSaveSuccess(false);
+      setSaveDialogState({ isSuccess: false, isLoading: true });
+      setShowSaveDialog(true);
 
       // Get token directly to verify it exists
       const token = getToken();
@@ -1292,22 +1311,7 @@ const ZapEditor: FC<ZapEditorProps> = ({
         throw new Error(errorMessage);
       }
 
-      // Success - show notification
-      setSaveSuccess(true);
-
-      // Show different messages based on mode
-      const successMessage = isEditMode
-        ? "Zap updated successfully!"
-        : "Zap created successfully!";
-      console.log(successMessage);
-
-      // Hide success message and redirect after 3 seconds
-      setTimeout(() => {
-        setSaveSuccess(false);
-        if (isEditMode) {
-          router.push("/dashboard");
-        }
-      }, 3000);
+      setSaveDialogState((prev) => ({ ...prev, isSuccess: true }));
     } catch (error) {
       console.error(
         isEditMode ? "Error updating zap:" : "Error creating zap:",
@@ -1316,11 +1320,38 @@ const ZapEditor: FC<ZapEditorProps> = ({
       setSaveError(
         error instanceof Error ? error.message : "An unknown error occurred"
       );
-      setTimeout(() => setSaveError(null), 3000);
+      setShowSaveDialog(false);
     } finally {
       setIsSaving(false);
+      setSaveDialogState((prev) => ({ ...prev, isLoading: false }));
     }
   };
+
+  // Update the handleCloseSaveDialog function
+  const handleCloseSaveDialog = useCallback(
+    (action?: "dashboard" | "stay") => {
+      if (saveDialogState.isSuccess) {
+        if (action === "dashboard") {
+          router.push("/dashboard");
+        } else {
+          // Just close the dialog and stay on the editor
+          setShowSaveDialog(false);
+          setSaveDialogState({
+            isSuccess: false,
+            isLoading: false,
+          });
+        }
+      } else {
+        // If not success state, just close the dialog
+        setShowSaveDialog(false);
+        setSaveDialogState({
+          isSuccess: false,
+          isLoading: false,
+        });
+      }
+    },
+    [saveDialogState.isSuccess, router]
+  );
 
   // Update zapData.zapName when zapName changes
   useEffect(() => {
@@ -1378,6 +1409,60 @@ const ZapEditor: FC<ZapEditorProps> = ({
     router.push("/dashboard");
   };
 
+  // Update the handleDeleteZap function
+  const handleDeleteZap = useCallback(() => {
+    setShowDeleteDialog(true);
+    setDeleteDialogState({
+      isSuccess: false,
+      isLoading: false,
+    });
+  }, []);
+
+  // Add the handleConfirmDelete function
+  const handleConfirmDelete = useCallback(async () => {
+    setDeleteDialogState((prev) => ({ ...prev, isLoading: true }));
+    try {
+      const response = await fetch(
+        buildApiUrl(API_ENDPOINTS.ZAP_DELETE(zapId)),
+        {
+          method: "POST",
+          headers: getAuthHeaders(false),
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          router.push("/signin");
+          throw new Error("Authentication failed. Please log in again.");
+        }
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to delete zap");
+      }
+
+      setDeleteDialogState((prev) => ({ ...prev, isSuccess: true }));
+    } catch (error) {
+      console.error("Error deleting zap:", error);
+      setDeleteError(
+        error instanceof Error ? error.message : "Failed to delete zap"
+      );
+      setShowDeleteDialog(false);
+    } finally {
+      setDeleteDialogState((prev) => ({ ...prev, isLoading: false }));
+    }
+  }, [zapId, router]);
+
+  // Add the handleCloseDeleteDialog function
+  const handleCloseDeleteDialog = useCallback(() => {
+    if (deleteDialogState.isSuccess) {
+      router.push("/dashboard");
+    }
+    setShowDeleteDialog(false);
+    setDeleteDialogState({
+      isSuccess: false,
+      isLoading: false,
+    });
+  }, [deleteDialogState.isSuccess, router]);
+
   return (
     <div className="flex flex-col h-[85vh] bg-zinc-950 overflow-hidden">
       {/* Header */}
@@ -1412,6 +1497,41 @@ const ZapEditor: FC<ZapEditorProps> = ({
           )}
         </div>
         <div className="flex space-x-2">
+          {isEditMode && (
+            <button
+              className="px-4 py-2 border border-red-500 bg-zinc-800 text-red-500 rounded-md font-mono font-medium hover:bg-red-500/10 transition-colors flex items-center"
+              onClick={handleDeleteZap}
+              disabled={isDeleting || isSaving || isClearing}
+            >
+              {deleteDialogState.isLoading ? (
+                <>
+                  <svg
+                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-red-500"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  Deleting...
+                </>
+              ) : (
+                "Delete Zap"
+              )}
+            </button>
+          )}
           {!isEditMode && (
             <button
               className="px-4 py-2 border border-red-500 bg-zinc-800 text-red-500 rounded-md font-mono font-medium hover:bg-red-500/10 transition-colors flex items-center"
@@ -1451,7 +1571,7 @@ const ZapEditor: FC<ZapEditorProps> = ({
             <button
               className="px-4 py-2 border border-gray-600 bg-zinc-800 text-gray-300 rounded-md font-mono font-medium hover:bg-zinc-700 transition-colors"
               onClick={handleCancelEdit}
-              disabled={isSaving || isClearing}
+              disabled={isSaving || isClearing || deleteDialogState.isLoading}
             >
               Cancel
             </button>
@@ -1459,9 +1579,9 @@ const ZapEditor: FC<ZapEditorProps> = ({
           <button
             className="px-4 py-2 bg-yellow-600 text-black rounded-md font-mono font-bold hover:bg-yellow-500 transition-colors flex items-center"
             onClick={saveZapToBackend}
-            disabled={isSaving || isClearing}
+            disabled={isSaving || isClearing || deleteDialogState.isLoading}
           >
-            {isSaving ? (
+            {deleteDialogState.isLoading ? (
               <>
                 <svg
                   className="animate-spin -ml-1 mr-2 h-4 w-4 text-black"
@@ -1483,7 +1603,7 @@ const ZapEditor: FC<ZapEditorProps> = ({
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   ></path>
                 </svg>
-                {isEditMode ? "Updating..." : "Creating..."}
+                Updating...
               </>
             ) : (
               <>{isEditMode ? "Update Zap" : "Create Zap"}</>
@@ -1492,18 +1612,10 @@ const ZapEditor: FC<ZapEditorProps> = ({
         </div>
       </div>
 
-      {/* Success/Error Messages */}
-      {(saveSuccess || saveError) && (
-        <div
-          className={`fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
-            saveSuccess ? "bg-green-500" : "bg-red-500"
-          } text-white font-mono`}
-        >
-          {saveSuccess
-            ? isEditMode
-              ? "Zap updated successfully!"
-              : "Zap created successfully!"
-            : saveError}
+      {/* Success/Error Messages - Remove or keep only for non-save errors */}
+      {saveError && (
+        <div className="fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 bg-red-500 text-white font-mono">
+          {saveError}
         </div>
       )}
 
@@ -1708,6 +1820,53 @@ const ZapEditor: FC<ZapEditorProps> = ({
         onConfirm={confirmDialogProps.onConfirm}
         title={confirmDialogProps.title}
         message={confirmDialogProps.message}
+      />
+
+      {/* Add the confirmation dialog */}
+      <ConfirmationDialog
+        isOpen={showDeleteDialog}
+        title={deleteDialogState.isSuccess ? "Success" : "Delete Zap"}
+        message={
+          deleteDialogState.isSuccess
+            ? "Zap has been deleted successfully!"
+            : "Are you sure you want to delete this zap? This action cannot be undone."
+        }
+        isSuccess={deleteDialogState.isSuccess}
+        isLoading={deleteDialogState.isLoading}
+        onConfirm={handleConfirmDelete}
+        onClose={handleCloseDeleteDialog}
+      />
+
+      {/* Update the save confirmation dialog */}
+      <ConfirmationDialog
+        isOpen={showSaveDialog}
+        title={
+          saveDialogState.isSuccess
+            ? "Success"
+            : isEditMode
+            ? "Updating Zap"
+            : "Creating Zap"
+        }
+        message={
+          saveDialogState.isSuccess
+            ? isEditMode
+              ? "Zap has been updated successfully!"
+              : "Zap has been created successfully! What would you like to do next?"
+            : isEditMode
+            ? "Updating your zap..."
+            : "Creating your zap..."
+        }
+        isSuccess={saveDialogState.isSuccess}
+        isLoading={saveDialogState.isLoading}
+        onConfirm={
+          saveDialogState.isSuccess
+            ? () => handleCloseSaveDialog("dashboard")
+            : () => handleCloseSaveDialog()
+        }
+        onClose={() => handleCloseSaveDialog("stay")}
+        confirmButtonText={saveDialogState.isSuccess ? "Go to Dashboard" : "OK"}
+        closeButtonText={saveDialogState.isSuccess ? "Stay Here" : "Cancel"}
+        showCloseButton={true}
       />
     </div>
   );

@@ -24,7 +24,7 @@ export const API_ENDPOINTS = {
   ZAPS: "/api/v1/zap/",
   ZAP_CREATE: "/api/v1/zap",
   ZAP_TOGGLE: (zapId: string) => `/api/v1/zap/${zapId}/toggle-active`,
-  ZAP_DELETE: (id: string) => `/api/v1/zap/${id}`,
+  ZAP_DELETE: (zapId: string) => `/api/v1/zap/${zapId}/delete`,
   ZAP_DETAIL: (id: string) => `/api/v1/zap/${id}`,
   ZAP_EDIT: (id: string) => `/api/v1/zap/${id}/edit`,
 
