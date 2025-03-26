@@ -1,5 +1,5 @@
 "use client";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -54,7 +54,8 @@ interface ZapResponse {
 const Dashboard = () => {
   const router = useRouter();
   const { backendUrl } = useEnvironment();
-  const [zaps, setZaps] = useState<Zap[]>([]);
+  const [publishedZaps, setPublishedZaps] = useState<Zap[]>([]);
+  const [unpublishedZaps, setUnpublishedZaps] = useState<Zap[]>([]);
   const [filteredZaps, setFilteredZaps] = useState<Zap[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -62,8 +63,6 @@ const Dashboard = () => {
   const [username, setUsername] = useState("");
   const [selectedZaps, setSelectedZaps] = useState<Record<string, boolean>>({});
   const [isDeleting, setIsDeleting] = useState(false);
-  // Count of selected zaps
-  const selectedCount = Object.values(selectedZaps).filter(Boolean).length;
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteDialogState, setDeleteDialogState] = useState({
     isSuccess: false,
@@ -71,6 +70,21 @@ const Dashboard = () => {
     zapId: "",
     zapName: "",
   });
+  const [showPublished, setShowPublished] = useState(true);
+
+  // Get current zaps based on the toggle and search query
+  const currentZaps = useMemo(() => {
+    const baseZaps = showPublished ? publishedZaps : unpublishedZaps;
+    if (!searchQuery.trim()) return baseZaps;
+
+    const lowercaseQuery = searchQuery.toLowerCase();
+    return baseZaps.filter((zap) =>
+      zap.zapName.toLowerCase().includes(lowercaseQuery)
+    );
+  }, [showPublished, publishedZaps, unpublishedZaps, searchQuery]);
+
+  // Count of selected zaps
+  const selectedCount = Object.values(selectedZaps).filter(Boolean).length;
 
   const fetchZaps = useCallback(async () => {
     setLoading(true);
@@ -100,7 +114,8 @@ const Dashboard = () => {
           })),
           trigger: null,
         }));
-        setZaps(mockZaps);
+        setPublishedZaps(mockZaps);
+        setUnpublishedZaps([]);
         setFilteredZaps(mockZaps);
         setUsername(mockData.username || "User");
         setLoading(false);
@@ -111,73 +126,109 @@ const Dashboard = () => {
 
       const token = getToken();
       if (!token) {
-        // Instead of redirecting, show an error and set empty data
         setError(
           "Authentication token missing. Please sign in to view your zaps."
         );
-        setZaps([]);
-        setFilteredZaps([]);
+        setPublishedZaps([]);
+        setUnpublishedZaps([]);
+        setLoading(false);
         return;
       }
 
-      // Note: API doesn't use "Bearer" prefix for the token
-      const response = await fetch(buildApiUrl(API_ENDPOINTS.ZAPS), {
-        method: "GET",
-        headers: getAuthHeaders(false), // Pass false to omit "Bearer" prefix
-      });
+      const publishedUrl = buildApiUrl(API_ENDPOINTS.ZAPS_PUBLISHED);
+      const unpublishedUrl = buildApiUrl(API_ENDPOINTS.ZAPS_UNPUBLISHED);
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          // Instead of redirecting, just show a helpful error message
-          setError("Authentication failed. Your session may have expired.");
-          setZaps([]);
-          setFilteredZaps([]);
-          return;
+      const authHeaders = {
+        "Content-Type": "application/json",
+        Authorization: token,
+      };
+
+      try {
+        // Fetch both published and unpublished zaps in parallel
+        const [publishedResponse, unpublishedResponse] = await Promise.all([
+          fetch(publishedUrl, { method: "GET", headers: authHeaders }),
+          fetch(unpublishedUrl, { method: "GET", headers: authHeaders }),
+        ]);
+
+        // If either request fails with 401, retry both with Bearer prefix
+        if (
+          publishedResponse.status === 401 ||
+          unpublishedResponse.status === 401
+        ) {
+          const bearerHeaders = {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          };
+
+          const [newPublishedResponse, newUnpublishedResponse] =
+            await Promise.all([
+              fetch(publishedUrl, { method: "GET", headers: bearerHeaders }),
+              fetch(unpublishedUrl, { method: "GET", headers: bearerHeaders }),
+            ]);
+
+          // Process the responses
+          const publishedZapsData = newPublishedResponse.ok
+            ? (await newPublishedResponse.json()).zaps || []
+            : [];
+          const unpublishedZapsData = newUnpublishedResponse.ok
+            ? (await newUnpublishedResponse.json()).zaps || []
+            : [];
+
+          setPublishedZaps(publishedZapsData);
+          setUnpublishedZaps(unpublishedZapsData);
+        } else {
+          // Process the original responses
+          const publishedZapsData = publishedResponse.ok
+            ? (await publishedResponse.json()).zaps || []
+            : [];
+          const unpublishedZapsData = unpublishedResponse.ok
+            ? (await unpublishedResponse.json()).zaps || []
+            : [];
+
+          setPublishedZaps(publishedZapsData);
+          setUnpublishedZaps(unpublishedZapsData);
         }
-        throw new Error(`Failed to fetch zaps: ${response.statusText}`);
+
+        setUsername("User");
+      } catch (fetchError) {
+        console.error("Network error fetching zaps:", fetchError);
+        setError(
+          "Failed to connect to the server. Please check your network connection."
+        );
       }
-      const data = await response.json();
-      console.log("Fetched zaps:", data);
-      // The API returns { zaps: [...] } so we need to extract the array
-      setZaps(data.zaps || []);
-      setFilteredZaps(data.zaps || []);
-      setSelectedZaps({});
-      setUsername("User"); // Set a default username
     } catch (error) {
-      console.error("Error fetching zaps:", error);
+      console.error("Error in fetchZaps:", error);
       setError(
         error instanceof Error
           ? error.message
-          : "Failed to load your zaps. Please check your backend URL and make sure the API is running."
+          : "An unexpected error occurred while loading your zaps."
       );
     } finally {
       setLoading(false);
     }
-  }, [router, backendUrl]);
+  }, [backendUrl]);
 
+  // Fetch zaps only once when component mounts
   useEffect(() => {
     if (!isAuthenticated()) {
       router.push("/signin");
       return;
     }
     fetchZaps();
-  }, [router, fetchZaps]);
+  }, [fetchZaps, router]);
 
-  // Filter zaps based on search query
+  // Update filtered zaps whenever currentZaps changes
   useEffect(() => {
-    if (searchQuery.trim() === "") {
-      setFilteredZaps(zaps);
-    } else {
-      const lowercaseQuery = searchQuery.toLowerCase();
-      const filtered = zaps.filter((zap) =>
-        zap.zapName.toLowerCase().includes(lowercaseQuery)
-      );
-      setFilteredZaps(filtered);
-    }
-  }, [searchQuery, zaps]);
+    setFilteredZaps(currentZaps);
+  }, [currentZaps]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
+  };
+
+  const handleTogglePublished = (newShowPublished: boolean) => {
+    setShowPublished(newShowPublished);
+    setSelectedZaps({}); // Reset selections when switching views
   };
 
   const handleToggleZap = async (id: string, currentStatus: boolean) => {
@@ -219,7 +270,12 @@ const Dashboard = () => {
         const data = await response.json();
 
         // Update local state with the returned zap data
-        setZaps((prevZaps) =>
+        setPublishedZaps((prevZaps) =>
+          prevZaps.map((zap) =>
+            zap.id === id ? { ...zap, isActive: data.zap.isActive } : zap
+          )
+        );
+        setUnpublishedZaps((prevZaps) =>
           prevZaps.map((zap) =>
             zap.id === id ? { ...zap, isActive: data.zap.isActive } : zap
           )
@@ -269,19 +325,35 @@ const Dashboard = () => {
   // Delete selected zaps
   const handleDeleteSelected = async () => {
     if (selectedCount === 0) return;
-    setIsDeleting(true);
+
+    // Show delete confirmation dialog for bulk deletion
+    setShowDeleteDialog(true);
+    setDeleteDialogState({
+      isSuccess: false,
+      isLoading: false,
+      zapId: "bulk", // Using "bulk" to indicate bulk deletion
+      zapName: `${selectedCount} selected zap${selectedCount > 1 ? "s" : ""}`,
+    });
+  };
+
+  // Add this function to handle bulk deletion after confirmation
+  const handleConfirmBulkDelete = async () => {
+    setDeleteDialogState((prev) => ({ ...prev, isLoading: true }));
+
     try {
       if (USE_MOCK_DATA) {
         // Just remove from our local state for mock data
         const zapIdsToDelete = Object.keys(selectedZaps).filter(
           (id) => selectedZaps[id]
         );
-        const updatedZaps = zaps.filter(
+        const updatedZaps = currentZaps.filter(
           (zap) => !zapIdsToDelete.includes(zap.id)
         );
-        setZaps(updatedZaps);
+        setPublishedZaps(updatedZaps);
+        setUnpublishedZaps(updatedZaps);
         setFilteredZaps(updatedZaps);
         setSelectedZaps({});
+        setDeleteDialogState((prev) => ({ ...prev, isSuccess: true }));
         return;
       }
 
@@ -310,8 +382,14 @@ const Dashboard = () => {
         })
       );
 
+      // Mark as success
+      setDeleteDialogState((prev) => ({ ...prev, isSuccess: true }));
+
       // Refetch zaps after deletion
-      fetchZaps();
+      await fetchZaps();
+
+      // Clear selection
+      setSelectedZaps({});
     } catch (error) {
       console.error("Error deleting zaps:", error);
       setError(
@@ -319,9 +397,60 @@ const Dashboard = () => {
           ? error.message
           : "Failed to delete zaps. Please try again."
       );
+      setShowDeleteDialog(false);
     } finally {
-      setIsDeleting(false);
+      setDeleteDialogState((prev) => ({ ...prev, isLoading: false }));
     }
+  };
+
+  // Update the delete confirmation logic
+  const handleConfirmDelete = async () => {
+    // If it's a bulk delete, use the bulk delete handler
+    if (deleteDialogState.zapId === "bulk") {
+      return handleConfirmBulkDelete();
+    }
+
+    setDeleteDialogState((prev) => ({ ...prev, isLoading: true }));
+    try {
+      const response = await fetch(
+        buildApiUrl(API_ENDPOINTS.ZAP_DELETE(deleteDialogState.zapId)),
+        {
+          method: "POST",
+          headers: getAuthHeaders(false),
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Authentication failed. Please try again.");
+        }
+        throw new Error(`Failed to delete zap ${deleteDialogState.zapId}`);
+      }
+
+      setDeleteDialogState((prev) => ({ ...prev, isSuccess: true }));
+      await fetchZaps(); // Refresh the zaps list
+    } catch (error) {
+      console.error("Error deleting zap:", error);
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Failed to delete zap. Please try again."
+      );
+      setShowDeleteDialog(false);
+    } finally {
+      setDeleteDialogState((prev) => ({ ...prev, isLoading: false }));
+    }
+  };
+
+  // Add this function to handle dialog close
+  const handleCloseDeleteDialog = () => {
+    setShowDeleteDialog(false);
+    setDeleteDialogState({
+      isSuccess: false,
+      isLoading: false,
+      zapId: "",
+      zapName: "",
+    });
   };
 
   // Format date nicely
@@ -451,51 +580,6 @@ const Dashboard = () => {
     });
   };
 
-  // Update the delete confirmation logic
-  const handleConfirmDelete = async () => {
-    setDeleteDialogState((prev) => ({ ...prev, isLoading: true }));
-    try {
-      const response = await fetch(
-        buildApiUrl(API_ENDPOINTS.ZAP_DELETE(deleteDialogState.zapId)),
-        {
-          method: "POST",
-          headers: getAuthHeaders(false),
-        }
-      );
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Authentication failed. Please try again.");
-        }
-        throw new Error(`Failed to delete zap ${deleteDialogState.zapId}`);
-      }
-
-      setDeleteDialogState((prev) => ({ ...prev, isSuccess: true }));
-      await fetchZaps(); // Refresh the zaps list
-    } catch (error) {
-      console.error("Error deleting zap:", error);
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Failed to delete zap. Please try again."
-      );
-      setShowDeleteDialog(false);
-    } finally {
-      setDeleteDialogState((prev) => ({ ...prev, isLoading: false }));
-    }
-  };
-
-  // Add this function to handle dialog close
-  const handleCloseDeleteDialog = () => {
-    setShowDeleteDialog(false);
-    setDeleteDialogState({
-      isSuccess: false,
-      isLoading: false,
-      zapId: "",
-      zapName: "",
-    });
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex justify-center items-center">
@@ -513,37 +597,64 @@ const Dashboard = () => {
           </div>
         )}
         <div className="flex justify-between items-center mb-4">
-          <div className="relative max-w-xs w-64">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg
-                className="h-5 w-5 text-gray-400"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z"
-                  clipRule="evenodd"
-                />
-              </svg>
+          <div className="flex items-center space-x-4">
+            <div className="relative max-w-xs w-64">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg
+                  className="h-5 w-5 text-gray-400"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={handleSearchChange}
+                placeholder="Search zaps..."
+                className="block w-full pl-10 py-2 border border-white rounded-md shadow-sm placeholder-white bg-black text-white focus:outline-none focus:ring-yellow-600 focus:border-yellow-600 font-mono"
+              />
             </div>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={handleSearchChange}
-              placeholder="Search zaps..."
-              className="block w-full pl-10 py-2 border border-white rounded-md shadow-sm placeholder-white bg-black text-white focus:outline-none focus:ring-yellow-600 focus:border-yellow-600 font-mono"
-            />
+
+            {/* Toggle Switch */}
+            <div className="flex items-center bg-zinc-900 rounded-lg border border-zinc-800 overflow-hidden">
+              <button
+                className={`px-4 py-2 text-sm font-medium font-mono ${
+                  showPublished
+                    ? "bg-yellow-600 text-black"
+                    : "text-zinc-400 hover:text-zinc-300"
+                }`}
+                onClick={() => handleTogglePublished(true)}
+              >
+                Published ({publishedZaps.length})
+              </button>
+              <button
+                className={`px-4 py-2 text-sm font-medium font-mono ${
+                  !showPublished
+                    ? "bg-yellow-600 text-black"
+                    : "text-zinc-400 hover:text-zinc-300"
+                }`}
+                onClick={() => handleTogglePublished(false)}
+              >
+                Drafts ({unpublishedZaps.length})
+              </button>
+            </div>
           </div>
-          <div className="flex space-x-3">
+          <div className="flex space-x-4">
             {selectedCount > 0 && (
               <button
-                className="px-4 py-2 bg-red-600 text-white rounded-md font-mono font-bold hover:bg-red-700 transition-colors flex items-center"
+                className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center font-mono font-bold"
                 onClick={handleDeleteSelected}
-                disabled={isDeleting}
+                disabled={deleteDialogState.isLoading}
               >
-                {isDeleting ? (
+                {deleteDialogState.isLoading &&
+                deleteDialogState.zapId === "bulk" ? (
                   <>
                     <svg
                       className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
@@ -568,7 +679,20 @@ const Dashboard = () => {
                     Deleting...
                   </>
                 ) : (
-                  <>Delete selected zaps ({selectedCount})</>
+                  <>
+                    <svg
+                      className="w-4 h-4 mr-1"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                    Delete Selected ({selectedCount})
+                  </>
                 )}
               </button>
             )}
@@ -617,11 +741,15 @@ const Dashboard = () => {
             <tbody className="divide-y divide-gray-800">
               {filteredZaps.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
-                    {zaps.length === 0 ? (
+                  <td colSpan={7} className="px-6 py-12 text-center">
+                    {currentZaps.length === 0 ? (
                       <>
                         <p className="text-gray-400 font-mono">
-                          No zaps found. Create your first zap!
+                          No {showPublished ? "published" : "draft"} zaps found.{" "}
+                          {showPublished
+                            ? "Publish a zap"
+                            : "Create your first zap"}
+                          !
                         </p>
                       </>
                     ) : (
@@ -734,13 +862,24 @@ const Dashboard = () => {
         title={deleteDialogState.isSuccess ? "Success" : "Delete Zap"}
         message={
           deleteDialogState.isSuccess
-            ? "Zap has been deleted successfully!"
+            ? deleteDialogState.zapId === "bulk"
+              ? "Zaps have been deleted successfully!"
+              : "Zap has been deleted successfully!"
+            : deleteDialogState.zapId === "bulk"
+            ? `Are you sure you want to delete ${deleteDialogState.zapName}? This action cannot be undone.`
             : `Are you sure you want to delete "${deleteDialogState.zapName}"? This action cannot be undone.`
         }
         isSuccess={deleteDialogState.isSuccess}
         isLoading={deleteDialogState.isLoading}
-        onConfirm={handleConfirmDelete}
+        onConfirm={
+          deleteDialogState.isSuccess
+            ? handleCloseDeleteDialog
+            : handleConfirmDelete
+        }
         onClose={handleCloseDeleteDialog}
+        confirmButtonText={deleteDialogState.isSuccess ? "OK" : "Delete"}
+        closeButtonText="Cancel"
+        showCloseButton={!deleteDialogState.isSuccess}
       />
     </div>
   );

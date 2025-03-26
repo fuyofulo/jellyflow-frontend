@@ -27,12 +27,24 @@ export const Navbar = () => {
 interface AuthenticatedNavbarProps {
   onSignout: () => void;
   username?: string;
+  onCustomNavigation?: (url: string) => void;
 }
 
 export const AuthenticatedNavbar = ({
   onSignout,
   username = "User",
+  onCustomNavigation,
 }: AuthenticatedNavbarProps) => {
+  const router = useRouter();
+
+  const handleNavigation = (url: string) => {
+    if (onCustomNavigation) {
+      onCustomNavigation(url);
+    } else {
+      router.push(url);
+    }
+  };
+
   return (
     <div className="w-full border-b border-gray-200 bg-black">
       <div className="mx-auto flex h-18 max-w-9xl items-center relative px-4 sm:px-6 lg:px-6">
@@ -45,49 +57,54 @@ export const AuthenticatedNavbar = ({
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
             className="mr-2"
+            onClick={() => handleNavigation("/dashboard")}
+            style={{ cursor: "pointer" }}
           >
             <rect width="32" height="32" rx="6" fill="#CA8A04" />
             <path d="M8 8H24V14H8V8Z" fill="white" />
             <path d="M8 18H16V24H8V18Z" fill="white" />
           </svg>
-          <Link href="/dashboard" className="text-xl font-mono font-bold">
+          <span
+            className="text-xl font-mono font-bold cursor-pointer"
+            onClick={() => handleNavigation("/dashboard")}
+          >
             Jelly Flow
-          </Link>
+          </span>
         </div>
 
         {/* Middle section - Navigation links */}
         <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center space-x-1">
           <Button7>Docs</Button7>
           <Button7>Twitter</Button7>
-          <Link href="/contact">
+          <span onClick={() => handleNavigation("/contact")}>
             <Button7>Contact</Button7>
-          </Link>
+          </span>
         </div>
 
         {/* Right section - User profile */}
         <div className="ml-auto flex items-center space-x-2">
-          <Link href="/dashboard">
+          <span onClick={() => handleNavigation("/dashboard")}>
             <Button7>Zaps</Button7>
-          </Link>
-          <Link href="/zap-editor">
+          </span>
+          <span onClick={() => handleNavigation("/zap-editor")}>
             <Button1>Create Zap</Button1>
-          </Link>
+          </span>
           <div className="relative group">
             <Button2>{username}</Button2>
             <div className="absolute right-0 mt-2 w-48 bg-zinc-900 border border-yellow-600/30 rounded-md shadow-lg hidden group-hover:block z-10">
               <div className="py-1">
-                <Link
-                  href="/profile"
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-zinc-800"
+                <span
+                  onClick={() => handleNavigation("/profile")}
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-zinc-800 cursor-pointer"
                 >
                   Profile
-                </Link>
-                <Link
-                  href="/settings"
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-zinc-800"
+                </span>
+                <span
+                  onClick={() => handleNavigation("/settings")}
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-zinc-800 cursor-pointer"
                 >
                   Settings
-                </Link>
+                </span>
                 <button
                   onClick={onSignout}
                   className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-zinc-800"

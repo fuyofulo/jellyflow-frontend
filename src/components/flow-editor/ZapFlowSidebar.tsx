@@ -56,10 +56,10 @@ const ZapFlowSidebar: React.FC<ZapFlowSidebarProps> = ({
     // Get the last node in the flow
     const lastNode = sortedNodes[sortedNodes.length - 1];
 
-    // Call the same handler that's used in the canvas
+    // Call the same handler that's used for the plus buttons in edges
     onAddNodeBelow(lastNode.id, {
-      x: 0, // These position values don't matter for the modal
-      y: 0, // The modal will appear centered on screen
+      x: 250, // Use a sensible default x position
+      y: lastNode.position.y + 200, // Position it below the last node
     });
   };
 
@@ -139,9 +139,9 @@ const ZapFlowSidebar: React.FC<ZapFlowSidebarProps> = ({
 
         {/* Add Action button at the end of the flow */}
         {sortedNodes.length > 0 && (
-          <div className="flex justify-center mt-3 mb-2">
+          <div className="flex justify-center mt-6 mb-2">
             <button
-              className="flex items-center px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-md hover:bg-zinc-800 transition-colors"
+              className="flex items-center px-4 py-2 bg-yellow-600 text-black rounded-md hover:bg-yellow-500 transition-colors shadow-md"
               onClick={handleAddAction}
             >
               <svg
@@ -154,12 +154,12 @@ const ZapFlowSidebar: React.FC<ZapFlowSidebarProps> = ({
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="text-yellow-500 mr-2"
+                className="mr-2"
               >
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
-              <span className="text-sm text-white">Add Action</span>
+              <span className="text-sm font-bold">Add Action</span>
             </button>
           </div>
         )}

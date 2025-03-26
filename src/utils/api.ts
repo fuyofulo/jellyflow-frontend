@@ -22,6 +22,8 @@ export const API_ENDPOINTS = {
 
   // Zaps
   ZAPS: "/api/v1/zap/",
+  ZAPS_PUBLISHED: "/api/v1/zap/published",
+  ZAPS_UNPUBLISHED: "/api/v1/zap/unpublished",
   ZAP_CREATE: "/api/v1/zap",
   ZAP_TOGGLE: (zapId: string) => `/api/v1/zap/${zapId}/toggle-active`,
   ZAP_DELETE: (zapId: string) => `/api/v1/zap/${zapId}/delete`,

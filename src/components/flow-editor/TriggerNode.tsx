@@ -8,6 +8,12 @@ interface TriggerNodeData {
   label: string;
   actionId: string;
   actionName: string;
+  metadata?:
+    | {
+        description?: string;
+        message?: string;
+      }
+    | string;
   onRename?: (newName: string) => void;
   onDelete?: () => void;
   onAddNodeBelow?: (nodeId: string, position: { x: number; y: number }) => void;
@@ -18,10 +24,22 @@ const TriggerNode = memo(
   ({ id, data, xPos, yPos }: NodeProps<TriggerNodeData>) => {
     const [menuOpen, setMenuOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
-    const [editValue, setEditValue] = useState(data.label);
+    const description =
+      typeof data.metadata === "object"
+        ? data.metadata.description || data.label
+        : data.label;
+    const [editValue, setEditValue] = useState(description);
     const menuRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const nodeRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+      const currentDescription =
+        typeof data.metadata === "object"
+          ? data.metadata.description || data.label
+          : data.label;
+      setEditValue(currentDescription);
+    }, [data.metadata, data.label]);
 
     // Close the menu when clicking outside
     useEffect(() => {
@@ -64,16 +82,27 @@ const TriggerNode = memo(
         handleRenameSubmit();
       } else if (e.key === "Escape") {
         setIsEditing(false);
-        setEditValue(data.label);
+        setEditValue(description);
       }
     };
 
-    const handleAddNodeClick = () => {
-      if (data.onAddNodeBelow && nodeRef.current) {
+    const handleAddNodeClick = (e: React.MouseEvent) => {
+      e.stopPropagation(); // Prevent the node click event from firing
+      console.log("Add node button clicked in TriggerNode", {
+        id,
+        xPos,
+        yPos,
+        hasCallback: !!data.onAddNodeBelow,
+      });
+
+      if (data.onAddNodeBelow) {
+        // Make sure we pass the node ID and position correctly
         data.onAddNodeBelow(id, {
           x: xPos,
           y: yPos + 200, // Position 200px below the current node
         });
+      } else {
+        console.error("onAddNodeBelow callback not provided to TriggerNode");
       }
     };
 
@@ -137,7 +166,7 @@ const TriggerNode = memo(
           ) : (
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-white">
-                {data.label}
+                {description}
               </span>
               <div className="relative" ref={menuRef}>
                 <button
@@ -228,19 +257,20 @@ const TriggerNode = memo(
         />
 
         {/* Add Node Button */}
-        <div className="absolute -bottom-10 left-1/2 -translate-x-1/2">
+        <div className="absolute left-1/2 bottom-0 transform -translate-x-1/2 translate-y-10">
           <button
             onClick={handleAddNodeClick}
-            className="flex items-center px-2 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-500 transition-colors shadow-md"
+            className="flex items-center px-3 py-1.5 bg-yellow-600 text-black rounded-md hover:bg-yellow-500 transition-colors shadow-md text-xs font-semibold"
+            title="Add action below"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
+              width="12"
+              height="12"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2"
+              strokeWidth="3"
               strokeLinecap="round"
               strokeLinejoin="round"
               className="mr-1"

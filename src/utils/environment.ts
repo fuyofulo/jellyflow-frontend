@@ -16,6 +16,19 @@ export const getBackendUrl = (): string => {
 };
 
 /**
+ * Get the webhook URL with proper fallbacks
+ * @returns The configured webhook URL or a default fallback using port 4000
+ */
+export const getWebhookUrl = (): string => {
+  // Use environment variable with fallback
+  const webhookUrl =
+    process.env.NEXT_PUBLIC_WEBHOOK_URL || "http://localhost:4000";
+
+  // Ensure URL doesn't have trailing slash for consistency in path concatenation
+  return webhookUrl.endsWith("/") ? webhookUrl.slice(0, -1) : webhookUrl;
+};
+
+/**
  * Check if we're in development mode
  */
 export const isDevelopment = (): boolean => {

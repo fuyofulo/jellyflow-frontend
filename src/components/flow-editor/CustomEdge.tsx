@@ -36,6 +36,13 @@ export const CustomEdge = ({
     targetPosition,
   });
 
+  const handleAddClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (data?.onAddNode && source && target) {
+      data.onAddNode(source, target, { x: centerX, y: centerY });
+    }
+  };
+
   return (
     <path
       id={id}

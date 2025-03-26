@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import ZapEditor from "@/components/pages/ZapEditor";
 import { AuthenticatedNavbar } from "@/components/navigation/Navbar";
 import { removeToken, getAuthHeaders } from "@/utils/auth";
@@ -14,6 +14,9 @@ export default function EditZapPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [zapData, setZapData] = useState<any>(null);
+  const editorRef = useRef<{ handleCustomNavigation?: (url: string) => void }>(
+    {}
+  );
 
   useEffect(() => {
     const fetchZapData = async () => {
@@ -63,6 +66,15 @@ export default function EditZapPage() {
     router.push("/signin");
   };
 
+  const handleCustomNavigation = (url: string) => {
+    // If editor has provided a navigation handler, use it, otherwise use router
+    if (editorRef.current?.handleCustomNavigation) {
+      editorRef.current.handleCustomNavigation(url);
+    } else {
+      router.push(url);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-zinc-950 flex justify-center items-center">
@@ -74,12 +86,15 @@ export default function EditZapPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-zinc-950 flex flex-col justify-center items-center text-white">
-        <AuthenticatedNavbar onSignout={handleSignout} />
+        <AuthenticatedNavbar
+          onSignout={handleSignout}
+          onCustomNavigation={handleCustomNavigation}
+        />
         <div className="bg-red-900/20 border border-red-500 rounded-lg p-6 max-w-md mx-auto mt-20">
           <h2 className="text-xl font-bold mb-4">Error</h2>
           <p className="text-red-300">{error}</p>
           <button
-            onClick={() => router.push("/dashboard")}
+            onClick={() => handleCustomNavigation("/dashboard")}
             className="mt-4 px-4 py-2 bg-yellow-600 text-black rounded font-bold hover:bg-yellow-500"
           >
             Back to Dashboard
@@ -91,8 +106,16 @@ export default function EditZapPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950">
-      <AuthenticatedNavbar onSignout={handleSignout} />
-      <ZapEditor isEditMode={true} zapId={zapId} initialZapData={zapData} />
+      <AuthenticatedNavbar
+        onSignout={handleSignout}
+        onCustomNavigation={handleCustomNavigation}
+      />
+      <ZapEditor
+        isEditMode={true}
+        zapId={zapId}
+        initialZapData={zapData}
+        ref={editorRef}
+      />
     </div>
   );
 }
