@@ -6,6 +6,7 @@ import { ActionIcon } from "@/utils/iconMapping";
 import { buildApiUrl, API_ENDPOINTS } from "@/utils/api";
 import { getToken, getAuthHeaders } from "@/utils/auth";
 import { getBackendUrl, getWebhookUrl } from "@/utils/environment";
+import { CodeBlock } from "@/components/ui/CodeBlock";
 
 // Type for webhook-specific configuration
 interface WebhookConfig {
@@ -20,6 +21,16 @@ interface WebhookConfig {
   urlGenerated?: boolean;
   requiresAuth: boolean;
   authToken: string;
+}
+
+// Add interface for response data
+interface WebhookResponse {
+  id: string;
+  timestamp?: string;
+  createdAt?: string;
+  zapId?: string;
+  metadata?: any;
+  data?: any;
 }
 
 const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
@@ -45,6 +56,14 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
   const [isGeneratingUrl, setIsGeneratingUrl] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Add new states for responses
+  const [webhookResponses, setWebhookResponses] = useState<WebhookResponse[]>(
+    []
+  );
+  const [isLoadingResponses, setIsLoadingResponses] = useState(false);
+  const [responseError, setResponseError] = useState<string | null>(null);
+  const [activeResponseIndex, setActiveResponseIndex] = useState(0);
 
   // Auto-fetch webhook URL if needed
   const autoFetchWebhookUrl = useCallback(
@@ -431,8 +450,185 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
     }
   };
 
+  // Load webhook responses
+  const loadWebhookResponses = async () => {
+    try {
+      setIsLoadingResponses(true);
+      setResponseError(null);
+
+      // Get zapId from the URL
+      const currentUrlPath = window.location.pathname;
+      const pathParts = currentUrlPath.split("/");
+      const zapId = pathParts[pathParts.length - 1];
+
+      if (!zapId) {
+        throw new Error("Could not determine Zap ID");
+      }
+
+      // Get backend URL
+      const backendUrl = getBackendUrl();
+      if (!backendUrl) {
+        throw new Error("Backend URL not configured");
+      }
+
+      // Make API request to fetch responses
+      const response = await fetch(`${backendUrl}/api/v1/zap/${zapId}/runs/3`, {
+        method: "GET",
+        headers: getAuthHeaders(false),
+      });
+
+      // Check content type before parsing
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error(
+          "Server returned non-JSON response. Please try again or contact support."
+        );
+      }
+
+      // Handle HTTP errors
+      if (!response.ok) {
+        if (response.status === 404) {
+          setResponseError(
+            "No webhook responses found. Try sending a test request to your webhook URL."
+          );
+          setWebhookResponses([]);
+          return;
+        }
+
+        // Try to parse error message if it's JSON
+        try {
+          const errorData = await response.json();
+          throw new Error(
+            errorData.message ||
+              `Error ${response.status}: ${response.statusText}`
+          );
+        } catch (parseError) {
+          throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+      }
+
+      // Parse the JSON response safely
+      let data;
+      try {
+        const text = await response.text();
+        data = text ? JSON.parse(text) : {};
+      } catch (parseError) {
+        console.error("Error parsing response:", parseError);
+        throw new Error(
+          "Failed to parse server response. Server may be experiencing issues."
+        );
+      }
+
+      // Extract runs array from the response, adapt to the actual API response structure
+      const runs = data.zapRuns || data.runs || data.responses || [];
+      setWebhookResponses(runs);
+      setActiveResponseIndex(0); // Reset to first response
+
+      if (runs.length === 0) {
+        setResponseError(
+          "No webhook responses found. Try sending a test request to your webhook URL."
+        );
+      }
+    } catch (error) {
+      console.error("Error loading webhook responses:", error);
+      setResponseError(
+        error instanceof Error
+          ? error.message
+          : "Failed to load webhook responses"
+      );
+      setWebhookResponses([]);
+    } finally {
+      setIsLoadingResponses(false);
+    }
+  };
+
+  // Function to recursively render JSON
+  const renderJsonValue = (value: any, depth = 0): React.ReactNode => {
+    if (value === null) return <span className="text-red-400">null</span>;
+    if (value === undefined)
+      return <span className="text-red-400">undefined</span>;
+
+    if (typeof value === "object") {
+      if (Array.isArray(value)) {
+        if (value.length === 0)
+          return <span className="text-blue-400">[]</span>;
+
+        return (
+          <div className="pl-4">
+            <span className="text-blue-400">[</span>
+            <div className="pl-4">
+              {value.map((item, index) => (
+                <div key={index} className="flex">
+                  <span>
+                    {renderJsonValue(item, depth + 1)}
+                    {index < value.length - 1 ? "," : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <span className="text-blue-400">]</span>
+          </div>
+        );
+      } else {
+        const keys = Object.keys(value);
+        if (keys.length === 0)
+          return <span className="text-blue-400">{"{}"}</span>;
+
+        return (
+          <div className="pl-4">
+            <span className="text-blue-400">{"{"}</span>
+            <div className="pl-4">
+              {keys.map((key, index) => (
+                <div key={key} className="flex">
+                  <span className="text-purple-400">"{key}"</span>
+                  <span className="text-white mx-1">:</span>
+                  <span>
+                    {renderJsonValue(value[key], depth + 1)}
+                    {index < keys.length - 1 ? "," : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <span className="text-blue-400">{"}"}</span>
+          </div>
+        );
+      }
+    } else if (typeof value === "string") {
+      return <span className="text-green-400">"{value}"</span>;
+    } else if (typeof value === "number") {
+      return <span className="text-yellow-400">{value}</span>;
+    } else if (typeof value === "boolean") {
+      return <span className="text-yellow-400">{value.toString()}</span>;
+    }
+
+    return <span>{String(value)}</span>;
+  };
+
   return (
     <div className="p-4 h-full flex flex-col">
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+          height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #27272a;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #eab308;
+          border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #f59e0b;
+        }
+        /* Smaller code block text */
+        .smaller-code-block pre,
+        .smaller-code-block code {
+          font-size: 0.7rem !important;
+          line-height: 1.3 !important;
+        }
+      `}</style>
+
       {/* Webhook Header with Logo */}
       <div className="flex items-center mb-3">
         <div className="p-2 bg-purple-900/20 rounded-md mr-2">
@@ -682,10 +878,120 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
               )}
             </div>
           ) : (
-            <div className="bg-zinc-800 border border-zinc-700 rounded p-3">
-              <p className="text-xs text-zinc-400 font-mono">
-                No test response yet
-              </p>
+            <div className="space-y-3">
+              <button
+                className="w-full px-3 py-2 bg-yellow-600 text-black text-sm rounded hover:bg-yellow-500 transition-colors flex items-center justify-center font-mono"
+                onClick={loadWebhookResponses}
+                disabled={isLoadingResponses}
+              >
+                {isLoadingResponses ? (
+                  <>
+                    <svg
+                      className="animate-spin -ml-1 mr-3 h-4 w-4 text-black"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="mr-2"
+                    >
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="7 10 12 15 17 10"></polyline>
+                      <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Load Response
+                  </>
+                )}
+              </button>
+
+              {responseError && (
+                <div className="bg-red-900/20 border border-red-900/30 rounded-md p-3">
+                  <p className="text-red-400 text-xs font-mono">
+                    {responseError}
+                  </p>
+                </div>
+              )}
+
+              {webhookResponses.length > 0 && (
+                <div className="space-y-4">
+                  {/* Response tabs */}
+                  <div className="flex border-b border-zinc-700 mb-3">
+                    {webhookResponses.map((_, index) => (
+                      <button
+                        key={index}
+                        className={`px-3 py-1.5 text-xs font-medium font-mono ${
+                          activeResponseIndex === index
+                            ? "text-yellow-500 border-b-2 border-yellow-500"
+                            : "text-zinc-400 hover:text-zinc-300"
+                        }`}
+                        onClick={() => setActiveResponseIndex(index)}
+                      >
+                        Response {index + 1}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Active response content */}
+                  {webhookResponses[activeResponseIndex] && (
+                    <div className="bg-zinc-800 border border-black rounded p-0">
+                      <p className="text-xs text-zinc-400 font-mono mb-0">
+                        {(webhookResponses[activeResponseIndex].timestamp ||
+                          webhookResponses[activeResponseIndex].createdAt) && (
+                          <span className="text-zinc-500">
+                            {new Date(
+                              webhookResponses[activeResponseIndex].timestamp ||
+                                webhookResponses[activeResponseIndex]
+                                  .createdAt ||
+                                ""
+                            ).toLocaleString()}
+                          </span>
+                        )}
+                      </p>
+                      <div className="max-h-56 overflow-auto custom-scrollbar">
+                        <div className="bg-black border border-black smaller-code-block">
+                          <CodeBlock
+                            language="json"
+                            filename=""
+                            code={JSON.stringify(
+                              webhookResponses[activeResponseIndex].metadata ||
+                                {},
+                              null,
+                              2
+                            )}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
