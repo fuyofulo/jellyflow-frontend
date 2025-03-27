@@ -835,8 +835,7 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
                     </p>
                     <div className="bg-zinc-700 p-1 rounded overflow-x-auto">
                       <code className="text-xs text-white font-mono whitespace-pre-wrap break-all">
-                        curl -X POST {webhookConfig.url} -H "Content-Type:
-                        application/json" -d '&#123;"key":"value"&#125;'
+                        {`curl -X POST ${webhookConfig.url} -H "Content-Type: application/json" -d "{\\"key\\":\\"value\\"}"`}
                       </code>
                     </div>
                     <p className="text-xs text-zinc-400 mt-1 font-mono">
