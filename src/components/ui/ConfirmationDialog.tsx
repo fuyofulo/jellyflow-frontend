@@ -25,18 +25,8 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   closeButtonText = "Cancel",
   showCloseButton = true,
 }) => {
-  // Add useEffect to automatically navigate to dashboard when deletion is successful
-  React.useEffect(() => {
-    // If dialog is showing success and the confirm button says "Go to Dashboard", auto-navigate
-    if (isOpen && isSuccess && confirmButtonText === "Go to Dashboard") {
-      // Add a short delay to show the success message before navigating
-      const timer = setTimeout(() => {
-        onConfirm();
-      }, 800);
-
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen, isSuccess, confirmButtonText, onConfirm]);
+  // Remove the auto-navigation effect to give users time to choose
+  // Users can now manually click "Go to Dashboard" or "Stay Here"
 
   if (!isOpen) return null;
 

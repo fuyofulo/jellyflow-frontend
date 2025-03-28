@@ -43,6 +43,7 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import ConfirmationDialog from "../ui/ConfirmationDialog";
 import { getBackendUrl, getWebhookUrl } from "@/utils/environment";
+import { useMetadataStore } from "@/stores/metadataStore";
 
 // Define the App interface
 interface App {
@@ -249,6 +250,13 @@ const ZapEditor = forwardRef<
     // Add a state to keep track of whether the zap has been published
     const [isZapPublished, setIsZapPublished] = useState(false);
 
+    // Add state to track if initial data load is complete
+    const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
+
+    // Add metadata store for sharing data between nodes
+    const { setNodeOutputData, getNodeOutputData, getUpstreamOutputData } =
+      useMetadataStore();
+
     // Expose the navigation handler via the ref
     useImperativeHandle(
       ref,
@@ -449,8 +457,14 @@ const ZapEditor = forwardRef<
                 actionMetadata: action.metadata || {},
               })) || [],
         });
+
+        // Mark initialization as complete
+        setIsInitialLoadComplete(true);
+      } else {
+        // Even if we don't have initial data, mark as complete
+        setIsInitialLoadComplete(true);
       }
-    }, [isEditMode, initialZapData, activeNodeId]);
+    }, [initialZapData, isEditMode]);
 
     // Load available actions and triggers from backend
     useEffect(() => {
@@ -1218,6 +1232,12 @@ const ZapEditor = forwardRef<
     // Fix the handleAppSelect function to handle the case when parent node is not found
     const handleAppSelect = async (appId: string) => {
       console.log("App selected:", appId);
+
+      // Check if this is an email app
+      if (appId === "email" || appId.toLowerCase().includes("email")) {
+        console.log("Email app selected! This should trigger EmailPanel");
+      }
+
       console.log(
         "All available actions:",
         availableActions.map((a) => ({ id: a.id, name: a.name }))
@@ -1773,7 +1793,7 @@ const ZapEditor = forwardRef<
 
     // Handler for updating node metadata
     const handleMetadataChange = useCallback(
-      (nodeId: string, newMetadata: Record<string, any>) => {
+      (nodeId: string, update: Record<string, any>) => {
         // Update the node data
         setNodes((nodes) =>
           nodes.map((node) => {
@@ -1781,9 +1801,9 @@ const ZapEditor = forwardRef<
               // Create a new data object with only the properties that are being updated
               const updatedData = { ...node.data };
 
-              // Only update the properties that were passed in newMetadata
-              Object.keys(newMetadata).forEach((key) => {
-                updatedData[key] = newMetadata[key];
+              // Only update the properties that were passed in update
+              Object.keys(update).forEach((key) => {
+                updatedData[key] = update[key];
               });
 
               return {
@@ -1805,8 +1825,8 @@ const ZapEditor = forwardRef<
               ...prevData,
               triggerMetadata: {
                 ...prevData.triggerMetadata,
-                description: newMetadata.description || newMetadata.label || "",
-                message: newMetadata.message || "",
+                description: update.description || update.label || "",
+                message: update.message || "",
               },
             }));
           } else {
@@ -1822,9 +1842,8 @@ const ZapEditor = forwardRef<
                     ...updatedActions[nodeIndex],
                     actionMetadata: {
                       ...updatedActions[nodeIndex].actionMetadata,
-                      description:
-                        newMetadata.description || newMetadata.label || "",
-                      message: newMetadata.message || "",
+                      description: update.description || update.label || "",
+                      message: update.message || "",
                     },
                   };
                 }
@@ -1836,8 +1855,16 @@ const ZapEditor = forwardRef<
             }
           }
         }
+
+        // After updating the node, if it's a response-producing node (e.g., webhook)
+        // you might want to process its output data for downstream nodes
+        const updatedNode = nodes.find((n) => n.id === nodeId);
+        if (updatedNode && updatedNode.data?.metadata?.responseData) {
+          // If the node produces response data, store it for downstream nodes
+          setNodeOutputData(nodeId, updatedNode.data.metadata.responseData);
+        }
       },
-      [nodes, getOrderedNodes]
+      [nodes, setNodes, setNodeOutputData]
     );
 
     // Fix the handleNodeClick function to explicitly show metadata panel only when clicked
@@ -2101,7 +2128,7 @@ const ZapEditor = forwardRef<
           }
 
           // Handle both object and string metadata formats for actions
-          const actionMetadata =
+          let actionMetadata =
             typeof node.data.metadata === "object"
               ? node.data.metadata
               : {
@@ -2109,12 +2136,20 @@ const ZapEditor = forwardRef<
                   message: node.data.metadata || "",
                 };
 
+          // Remove message field for email actions that use the new metadata structure
+          if (
+            actionMetadata &&
+            actionMetadata["action event"] &&
+            actionMetadata.data
+          ) {
+            // Make sure we use a clean copy without the message field
+            const { message, ...cleanMetadata } = actionMetadata;
+            actionMetadata = cleanMetadata;
+          }
+
           return {
             availableActionId: mappedActionId,
-            actionMetadata: {
-              description: actionMetadata.description || node.data.label || "",
-              message: actionMetadata.message || "",
-            },
+            actionMetadata: actionMetadata, // Pass the complete metadata object
           };
         });
 
@@ -2122,11 +2157,7 @@ const ZapEditor = forwardRef<
         const payload = {
           zapName: zapName,
           availableTriggerId: mappedTriggerId,
-          triggerMetadata: {
-            description:
-              triggerMetadata.description || triggerNode.data.label || "",
-            message: triggerMetadata.message || "",
-          },
+          triggerMetadata: triggerMetadata, // Pass the complete trigger metadata
           actions: actionsWithUniqueIds,
           // Add isPublished flag to the payload
           isPublished: true,
@@ -2933,6 +2964,50 @@ const ZapEditor = forwardRef<
         console.log("Zap published status:", initialZapData.isPublished);
       }
     }, [initialZapData]);
+
+    // Add this function near other node/edge management functions
+    const updateNodeConnections = useCallback(() => {
+      if (!edges.length) return;
+
+      // Build a map of upstream nodes for each node
+      const nodeConnectionMap: Record<string, string[]> = {};
+
+      // Initialize all nodes in the map
+      nodes.forEach((node) => {
+        nodeConnectionMap[node.id] = [];
+      });
+
+      // For each edge, add the source as an upstream node of the target
+      edges.forEach((edge) => {
+        if (!nodeConnectionMap[edge.target]) {
+          nodeConnectionMap[edge.target] = [];
+        }
+
+        // Add direct parent
+        nodeConnectionMap[edge.target].push(edge.source);
+
+        // Add parent's parents (transitive)
+        const parentsOfParent = nodeConnectionMap[edge.source] || [];
+        nodeConnectionMap[edge.target].push(...parentsOfParent);
+      });
+
+      // Update available data for each node based on its upstream connections
+      nodes.forEach((node) => {
+        // For debugging
+        console.log(
+          `Node ${node.id} has upstream nodes:`,
+          nodeConnectionMap[node.id]
+        );
+      });
+    }, [edges, nodes]);
+
+    // Add an effect to update node connections when nodes or edges change
+    useEffect(() => {
+      if (isInitialLoadComplete) {
+        console.log("Nodes or edges changed, updating node connections...");
+        updateNodeConnections();
+      }
+    }, [isInitialLoadComplete, nodes, edges, updateNodeConnections]);
 
     return (
       <div className="flex flex-col h-[85vh] bg-zinc-950 overflow-hidden">

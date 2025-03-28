@@ -43,7 +43,7 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
     method: "POST",
     headers: {},
     requireAuthToken: false,
-    activeTab: "setup",
+    activeTab: "response",
     description: "",
     setupCompleted: false,
     testCompleted: false,
@@ -57,7 +57,7 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Add new states for responses
+  // States for responses
   const [webhookResponses, setWebhookResponses] = useState<WebhookResponse[]>(
     []
   );
@@ -660,7 +660,7 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
         />
       </div>
 
-      {/* URL Display */}
+      {/* URL Display - Keep the URL display but remove the test button */}
       <div className="mb-4">
         <label className="block text-xs font-medium text-zinc-400 mb-1 font-mono">
           Webhook URL
@@ -681,30 +681,31 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
               className="w-full bg-zinc-800 border border-zinc-700 rounded text-white px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50 pr-10 font-mono overflow-x-auto text-ellipsis"
               title={webhookConfig.url}
             />
-            <button
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-zinc-400 hover:text-white"
-              onClick={() => {
-                navigator.clipboard.writeText(webhookConfig.url || "");
-                setSuccess("URL copied to clipboard!");
-                setTimeout(() => setSuccess(null), 2000);
-              }}
-              title="Copy URL"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+            <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
+              <button
+                className="text-zinc-400 hover:text-white"
+                onClick={() => {
+                  navigator.clipboard.writeText(webhookConfig.url || "");
+                  setSuccess("URL copied to clipboard!");
+                  setTimeout(() => setSuccess(null), 2000);
+                }}
+                title="Copy URL"
               >
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-              </svg>
-            </button>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+              </button>
+            </div>
           </div>
         ) : error ? (
           <div className="bg-red-900/20 border border-red-900/30 rounded-md p-3">
@@ -738,261 +739,123 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
         )}
       </div>
 
-      {/* Tabbed Interface */}
+      {/* Response Section - Simplified to just show responses directly */}
       <div className="flex-1 flex flex-col">
-        <div className="border-b border-zinc-800">
-          <div className="flex">
-            <button
-              className={`px-4 py-2 text-sm font-medium font-mono ${
-                webhookConfig.activeTab === "test"
-                  ? "text-yellow-500 border-b-2 border-yellow-500"
-                  : "text-zinc-400 hover:text-zinc-300"
-              }`}
-              onClick={() =>
-                setWebhookConfig({ ...webhookConfig, activeTab: "test" })
-              }
-            >
-              Test URL
-            </button>
-            <button
-              className={`px-4 py-2 text-sm font-medium font-mono ${
-                webhookConfig.activeTab === "response"
-                  ? "text-yellow-500 border-b-2 border-yellow-500"
-                  : "text-zinc-400 hover:text-zinc-300"
-              }`}
-              onClick={() =>
-                setWebhookConfig({ ...webhookConfig, activeTab: "response" })
-              }
-            >
-              See Response
-            </button>
-          </div>
-        </div>
-
         <div className="flex-1 p-4">
-          {webhookConfig.activeTab === "test" ? (
-            <div className="space-y-3">
-              {webhookConfig.url ? (
+          <div className="space-y-3">
+            <button
+              className="w-full px-3 py-2 bg-yellow-600 text-black text-sm rounded hover:bg-yellow-500 transition-colors flex items-center justify-center font-mono"
+              onClick={loadWebhookResponses}
+              disabled={isLoadingResponses}
+            >
+              {isLoadingResponses ? (
                 <>
-                  <div className="bg-zinc-800 border border-zinc-700 rounded p-3">
-                    {/* Section title */}
-                    <p className="text-xs text-zinc-400 mb-2 font-mono">
-                      cURL Command
-                    </p>
-
-                    {/* Note above command */}
-                    <p className="text-xs text-yellow-500/80 font-mono mb-2">
-                      Note: This sends an empty request.
-                    </p>
-
-                    {/* Basic command with copy button in styled box */}
-                    <div className="flex items-start justify-between bg-zinc-700 p-1 rounded mb-3">
-                      <div className="overflow-x-auto max-w-[90%] whitespace-pre-wrap break-all mr-2">
-                        <code className="text-xs text-white font-mono">
-                          curl -X POST {webhookConfig.url}
-                        </code>
-                      </div>
-                      <button
-                        className="text-zinc-400 hover:text-white flex-shrink-0"
-                        onClick={() => {
-                          navigator.clipboard.writeText(
-                            `curl -X POST ${webhookConfig.url}`
-                          );
-                          setSuccess("Command copied to clipboard!");
-                          setTimeout(() => setSuccess(null), 2000);
-                        }}
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <rect
-                            x="9"
-                            y="9"
-                            width="13"
-                            height="13"
-                            rx="2"
-                            ry="2"
-                          ></rect>
-                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                        </svg>
-                      </button>
-                    </div>
-
-                    {/* Separator */}
-                    <div className="border-t border-zinc-700 mb-2"></div>
-
-                    {/* Command with data */}
-                    <p className="text-xs text-yellow-500/80 font-mono mb-2">
-                      Use this command to include JSON data:
-                    </p>
-                    <div className="bg-zinc-700 p-1 rounded overflow-x-auto">
-                      <code className="text-xs text-white font-mono whitespace-pre-wrap break-all">
-                        {`curl -X POST ${webhookConfig.url} -H "Content-Type: application/json" -d "{\\"key\\":\\"value\\"}"`}
-                      </code>
-                    </div>
-                    <p className="text-xs text-zinc-400 mt-1 font-mono">
-                      Replace the JSON payload with your own data structure as
-                      needed.
-                    </p>
-                  </div>
-                  <button
-                    className="w-full px-3 py-2 bg-yellow-600 text-black text-sm rounded hover:bg-yellow-500 transition-colors flex items-center justify-center font-mono"
-                    onClick={() =>
-                      setWebhookConfig({
-                        ...webhookConfig,
-                        activeTab: "response",
-                      })
-                    }
+                  <svg
+                    className="animate-spin -ml-1 mr-3 h-4 w-4 text-black"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
                   >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
                       stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="mr-2"
-                    >
-                      <polyline points="9 11 12 14 22 4"></polyline>
-                      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-                    </svg>
-                    Check Response
-                  </button>
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  Loading...
                 </>
               ) : (
-                <p className="text-xs text-zinc-400 font-mono">
-                  Generate a webhook URL to test
+                <>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="mr-2"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  Load Response
+                </>
+              )}
+            </button>
+
+            {responseError && (
+              <div className="bg-red-900/20 border border-red-900/30 rounded-md p-3">
+                <p className="text-red-400 text-xs font-mono">
+                  {responseError}
                 </p>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <button
-                className="w-full px-3 py-2 bg-yellow-600 text-black text-sm rounded hover:bg-yellow-500 transition-colors flex items-center justify-center font-mono"
-                onClick={loadWebhookResponses}
-                disabled={isLoadingResponses}
-              >
-                {isLoadingResponses ? (
-                  <>
-                    <svg
-                      className="animate-spin -ml-1 mr-3 h-4 w-4 text-black"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    Loading...
-                  </>
-                ) : (
-                  <>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="mr-2"
-                    >
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                      <polyline points="7 10 12 15 17 10"></polyline>
-                      <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                    Load Response
-                  </>
-                )}
-              </button>
+              </div>
+            )}
 
-              {responseError && (
-                <div className="bg-red-900/20 border border-red-900/30 rounded-md p-3">
-                  <p className="text-red-400 text-xs font-mono">
-                    {responseError}
-                  </p>
+            {webhookResponses.length > 0 && (
+              <div className="space-y-4">
+                {/* Response tabs */}
+                <div className="flex border-b border-zinc-700 mb-3">
+                  {webhookResponses.map((_, index) => (
+                    <button
+                      key={index}
+                      className={`px-3 py-1.5 text-xs font-medium font-mono ${
+                        activeResponseIndex === index
+                          ? "text-yellow-500 border-b-2 border-yellow-500"
+                          : "text-zinc-400 hover:text-zinc-300"
+                      }`}
+                      onClick={() => setActiveResponseIndex(index)}
+                    >
+                      Response {index + 1}
+                    </button>
+                  ))}
                 </div>
-              )}
 
-              {webhookResponses.length > 0 && (
-                <div className="space-y-4">
-                  {/* Response tabs */}
-                  <div className="flex border-b border-zinc-700 mb-3">
-                    {webhookResponses.map((_, index) => (
-                      <button
-                        key={index}
-                        className={`px-3 py-1.5 text-xs font-medium font-mono ${
-                          activeResponseIndex === index
-                            ? "text-yellow-500 border-b-2 border-yellow-500"
-                            : "text-zinc-400 hover:text-zinc-300"
-                        }`}
-                        onClick={() => setActiveResponseIndex(index)}
-                      >
-                        Response {index + 1}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Active response content */}
-                  {webhookResponses[activeResponseIndex] && (
-                    <div className="bg-zinc-800 border border-black rounded p-0">
-                      <p className="text-xs text-zinc-400 font-mono mb-0">
-                        {(webhookResponses[activeResponseIndex].timestamp ||
-                          webhookResponses[activeResponseIndex].createdAt) && (
-                          <span className="text-zinc-500">
-                            {new Date(
-                              webhookResponses[activeResponseIndex].timestamp ||
-                                webhookResponses[activeResponseIndex]
-                                  .createdAt ||
-                                ""
-                            ).toLocaleString()}
-                          </span>
-                        )}
-                      </p>
-                      <div className="max-h-56 overflow-auto custom-scrollbar">
-                        <div className="bg-black border border-black smaller-code-block">
-                          <CodeBlock
-                            language="json"
-                            filename=""
-                            code={JSON.stringify(
-                              webhookResponses[activeResponseIndex].metadata ||
-                                {},
-                              null,
-                              2
-                            )}
-                          />
-                        </div>
+                {/* Active response content */}
+                {webhookResponses[activeResponseIndex] && (
+                  <div className="bg-zinc-800 border border-black rounded p-0">
+                    <p className="text-xs text-zinc-400 font-mono mb-0">
+                      {(webhookResponses[activeResponseIndex].timestamp ||
+                        webhookResponses[activeResponseIndex].createdAt) && (
+                        <span className="text-zinc-500">
+                          {new Date(
+                            webhookResponses[activeResponseIndex].timestamp ||
+                              webhookResponses[activeResponseIndex].createdAt ||
+                              ""
+                          ).toLocaleString()}
+                        </span>
+                      )}
+                    </p>
+                    <div className="max-h-56 overflow-auto custom-scrollbar">
+                      <div className="bg-black border border-black code-block">
+                        <CodeBlock
+                          language="json"
+                          filename=""
+                          code={JSON.stringify(
+                            webhookResponses[activeResponseIndex].metadata ||
+                              {},
+                            null,
+                            2
+                          )}
+                        />
                       </div>
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

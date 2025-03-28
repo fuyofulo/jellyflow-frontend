@@ -3,7 +3,7 @@
 import React from "react";
 import { WebhookPanel } from "./index";
 import { BaseMetadataPanelProps } from "./BaseMetadataPanel";
-import { getPanelForApp } from "./app-panels";
+import { getPanelForApp, APP_PANELS } from "./app-panels";
 
 interface PanelFactoryProps extends BaseMetadataPanelProps {
   // No additional props needed beyond BaseMetadataPanelProps
@@ -23,13 +23,17 @@ const PanelFactory: React.FC<PanelFactoryProps> = (props) => {
   const appId = node.data?.actionId || "";
   const nodeType = node.type || "";
 
-  // For trigger nodes, force WebhookPanel
+  // For trigger nodes, use WebhookPanel as default if no specific panel is mapped
   if (nodeType === "trigger") {
-    return <WebhookPanel {...props} />;
+    const PanelComponent = getPanelForApp(appId, node.data);
+    if (PanelComponent === APP_PANELS.default) {
+      return <WebhookPanel {...props} />;
+    }
+    return <PanelComponent {...props} />;
   }
 
   // For other nodes, use normal panel selection
-  const PanelComponent = getPanelForApp(appId);
+  const PanelComponent = getPanelForApp(appId, node.data);
 
   return <PanelComponent {...props} />;
 };

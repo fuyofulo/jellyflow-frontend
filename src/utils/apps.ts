@@ -101,6 +101,10 @@ export const updateApps = (
   // If we don't have any backend data, keep using the fallbacks
   if (actions.length === 0 && triggers.length === 0) {
     console.log("[apps] No backend services available, using fallbacks.");
+    console.log(
+      "[apps] Fallback email app:",
+      fallbackApps.find((app) => app.id === "email")
+    );
     return;
   }
 
@@ -128,6 +132,13 @@ export const updateApps = (
     };
     newApps.push(app);
     console.log(`[apps] Added action app: ${app.id} (${app.name})`);
+
+    // Check specifically for email
+    if (action.name.toLowerCase().includes("email")) {
+      console.log(
+        `[apps] Email action found in backend: ${action.id} - ${action.name}`
+      );
+    }
   });
 
   // If we have backend data but for some reason it's empty,
@@ -137,9 +148,26 @@ export const updateApps = (
     newApps.push(...fallbackApps);
   }
 
+  // Ensure email is always available by adding it explicitly if not present
+  if (
+    !newApps.some(
+      (app) => app.id === "email" || app.name.toLowerCase().includes("email")
+    )
+  ) {
+    console.log("[apps] Email app not found in backend data, adding fallback");
+    const emailApp = fallbackApps.find((app) => app.id === "email");
+    if (emailApp) {
+      newApps.push(emailApp);
+    }
+  }
+
   // Update the apps array
   apps = newApps;
   console.log(`[apps] Updated apps list with ${apps.length} items`);
+  const emailApp = apps.find(
+    (app) => app.id === "email" || app.name.toLowerCase().includes("email")
+  );
+  console.log("[apps] Final email app:", emailApp);
 };
 
 // Helper to capitalize first letter of a string

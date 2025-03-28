@@ -29,6 +29,8 @@ export const API_ENDPOINTS = {
   ZAP_DELETE: (zapId: string) => `/api/v1/zap/${zapId}/delete`,
   ZAP_DETAIL: (id: string) => `/api/v1/zap/${id}`,
   ZAP_EDIT: (id: string) => `/api/v1/zap/${id}/edit`,
+  ZAP_RUNS: (zapId: string, limit: number = 3) =>
+    `/api/v1/zap/${zapId}/runs/${limit}`,
 
   // Services
   AVAILABLE_TRIGGERS: "/api/v1/trigger/available",
