@@ -462,13 +462,17 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
       const zapId = pathParts[pathParts.length - 1];
 
       if (!zapId) {
-        throw new Error("Could not determine Zap ID");
+        setResponseError("Could not determine Zap ID");
+        setIsLoadingResponses(false);
+        return;
       }
 
       // Get backend URL
       const backendUrl = getBackendUrl();
       if (!backendUrl) {
-        throw new Error("Backend URL not configured");
+        setResponseError("Backend URL not configured");
+        setIsLoadingResponses(false);
+        return;
       }
 
       // Make API request to fetch responses
@@ -480,9 +484,11 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
       // Check content type before parsing
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
-        throw new Error(
+        setResponseError(
           "Server returned non-JSON response. Please try again or contact support."
         );
+        setIsLoadingResponses(false);
+        return;
       }
 
       // Handle HTTP errors
@@ -492,19 +498,22 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
             "No webhook responses found. Try sending a test request to your webhook URL."
           );
           setWebhookResponses([]);
+          setIsLoadingResponses(false);
           return;
         }
 
         // Try to parse error message if it's JSON
         try {
           const errorData = await response.json();
-          throw new Error(
+          setResponseError(
             errorData.message ||
               `Error ${response.status}: ${response.statusText}`
           );
         } catch (parseError) {
-          throw new Error(`Error ${response.status}: ${response.statusText}`);
+          setResponseError(`Error ${response.status}: ${response.statusText}`);
         }
+        setIsLoadingResponses(false);
+        return;
       }
 
       // Parse the JSON response safely
@@ -514,9 +523,11 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
         data = text ? JSON.parse(text) : {};
       } catch (parseError) {
         console.error("Error parsing response:", parseError);
-        throw new Error(
+        setResponseError(
           "Failed to parse server response. Server may be experiencing issues."
         );
+        setIsLoadingResponses(false);
+        return;
       }
 
       // Extract runs array from the response, adapt to the actual API response structure
@@ -528,6 +539,32 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
         setResponseError(
           "No webhook responses found. Try sending a test request to your webhook URL."
         );
+        setIsLoadingResponses(false);
+        return;
+      }
+
+      // Store the webhook responses in node metadata
+      if (onMetadataChange && node && node.id) {
+        // Get current metadata to preserve existing fields
+        const existingMetadata = node.data?.metadata || {};
+        const existingWebhook = existingMetadata.webhook || {};
+
+        // Update metadata with webhookDataReceived flag and store responses
+        const metadataUpdate = {
+          metadata: {
+            ...existingMetadata,
+            webhook: {
+              ...existingWebhook,
+              testCompleted: true, // Mark webhook as tested
+              webhookDataReceived: true, // For backward compatibility
+            },
+            webhookDataReceived: true, // Set flag at root level for validation
+            webhookResponses: runs, // Store the actual response data
+          },
+        };
+
+        // Update the node metadata
+        onMetadataChange(node.id, metadataUpdate);
       }
     } catch (error) {
       console.error("Error loading webhook responses:", error);
@@ -603,6 +640,30 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
 
     return <span>{String(value)}</span>;
   };
+
+  // Add a useEffect to check for stored webhook responses in the node metadata
+  useEffect(() => {
+    // Check if we already have webhook responses in the node metadata
+    if (
+      node?.data?.metadata?.webhookResponses &&
+      node.data.metadata.webhookResponses.length > 0
+    ) {
+      // Set the webhook responses from metadata
+      setWebhookResponses(node.data.metadata.webhookResponses);
+      setActiveResponseIndex(0); // Show the first response
+
+      // Clear any existing error since we have data
+      setResponseError(null);
+    }
+    // Also check for test completed flag
+    else if (
+      node?.data?.metadata?.webhook?.testCompleted ||
+      node?.data?.metadata?.webhookDataReceived
+    ) {
+      // If test is completed but no responses stored, we should load them
+      loadWebhookResponses();
+    }
+  }, [node?.id]); // Re-run when the node ID changes
 
   return (
     <div className="p-4 h-full flex flex-col">

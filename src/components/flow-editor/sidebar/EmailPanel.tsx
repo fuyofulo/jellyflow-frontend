@@ -90,7 +90,9 @@ const EmailPanel: React.FC<BaseMetadataPanelProps> = ({
       const zapId = pathParts[pathParts.length - 1];
 
       if (!zapId) {
-        throw new Error("Could not determine Zap ID");
+        setWebhookDataError("Could not determine Zap ID");
+        setIsLoadingWebhookData(false);
+        return;
       }
 
       // Make API request to fetch latest webhook response
@@ -104,31 +106,54 @@ const EmailPanel: React.FC<BaseMetadataPanelProps> = ({
 
       if (!response.ok) {
         if (response.status === 404) {
-          throw new Error(
+          setWebhookDataError(
             "No webhook data found. Send a test request to your webhook URL first."
           );
+          setIsLoadingWebhookData(false);
+          return;
         }
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
+        setWebhookDataError(`Error ${response.status}: ${response.statusText}`);
+        setIsLoadingWebhookData(false);
+        return;
       }
 
       const data = await response.json();
       const runs = data.zapRuns || data.runs || data.responses || [];
 
       if (runs.length === 0) {
-        throw new Error(
+        setWebhookDataError(
           "No webhook responses found. Try sending a request to your webhook URL first."
         );
+        setIsLoadingWebhookData(false);
+        return;
       }
 
       // Use the most recent webhook response
       const latestResponse = runs[0];
-      setWebhookResponseData(latestResponse.metadata || {});
+      const webhookData = latestResponse.metadata || {};
+      setWebhookResponseData(webhookData);
 
       // Extract variables from the response data
-      const extractedVariables = extractVariablesFromData(
-        latestResponse.metadata || {}
-      );
+      const extractedVariables = extractVariablesFromData(webhookData);
       setAvailableVariables(extractedVariables);
+
+      // Set a flag on the root node metadata to indicate webhook data was received
+      if (onMetadataChange && node && node.id) {
+        // Get current metadata to preserve existing fields
+        const existingMetadata = node.data?.metadata || {};
+
+        // Update metadata with webhookDataReceived flag and store the webhook response data
+        const metadataUpdate = {
+          metadata: {
+            ...existingMetadata,
+            webhookDataReceived: true,
+            webhookResponseData: webhookData,
+          },
+        };
+
+        // Update the node metadata
+        onMetadataChange(node.id, metadataUpdate);
+      }
     } catch (error) {
       console.error("Error loading webhook data:", error);
       setWebhookDataError(
@@ -138,6 +163,22 @@ const EmailPanel: React.FC<BaseMetadataPanelProps> = ({
       setIsLoadingWebhookData(false);
     }
   };
+
+  // Add a useEffect to check for stored webhook data in the node metadata when component mounts
+  useEffect(() => {
+    // Check if we already have webhook data in the node metadata
+    if (node?.data?.metadata?.webhookResponseData) {
+      const storedWebhookData = node.data.metadata.webhookResponseData;
+
+      // Set the webhook data and extract variables
+      setWebhookResponseData(storedWebhookData);
+      const extractedVariables = extractVariablesFromData(storedWebhookData);
+      setAvailableVariables(extractedVariables);
+    } else {
+      // If no stored data, try to load it
+      loadWebhookResponseData();
+    }
+  }, [node?.id]); // Re-run when the node ID changes
 
   // Extract variables from webhook response data
   const extractVariablesFromData = (
@@ -206,11 +247,6 @@ const EmailPanel: React.FC<BaseMetadataPanelProps> = ({
     return variables;
   };
 
-  // Load webhook data when the component mounts
-  useEffect(() => {
-    loadWebhookResponseData();
-  }, []);
-
   // Load existing email configuration from node metadata
   useEffect(() => {
     // Initialize description from node metadata
@@ -219,8 +255,36 @@ const EmailPanel: React.FC<BaseMetadataPanelProps> = ({
         ? node.data.metadata.description
         : node.data?.label || "";
 
-    // Load existing email config if available
-    if (node?.data?.metadata?.email) {
+    // Check if we have metadata in the new structure
+    if (
+      typeof node.data?.metadata === "object" &&
+      (node.data.metadata.actionEvent || node.data.metadata["action event"]) &&
+      node.data.metadata.data
+    ) {
+      // Load from new metadata structure
+      const metadata = node.data.metadata;
+      // Support both formats for backward compatibility
+      const actionEvent = metadata.actionEvent || metadata["action event"];
+      const data = metadata.data;
+
+      // Get recipients as array
+      const recipients = Array.isArray(data.recipients)
+        ? data.recipients
+        : data.recipients
+        ? [data.recipients]
+        : [""];
+
+      setEmailConfig({
+        ...emailConfig,
+        actionEvent,
+        recipients,
+        subject: data.subject || "",
+        body: data.body || "",
+        description,
+      });
+    }
+    // Backward compatibility with old metadata structure
+    else if (node?.data?.metadata?.email) {
       const existingConfig = node.data.metadata.email;
 
       // Handle backward compatibility for recipient -> recipients
@@ -413,7 +477,7 @@ const EmailPanel: React.FC<BaseMetadataPanelProps> = ({
       const metadataUpdate = {
         metadata: {
           description: config.description || "",
-          "action event": config.actionEvent,
+          actionEvent: config.actionEvent,
           data: {
             recipients: config.recipients || [""],
             subject: config.subject || "",

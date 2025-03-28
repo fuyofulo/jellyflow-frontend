@@ -392,11 +392,7 @@ const ZapEditor = forwardRef<
                 label: action.type?.name || `Action ${index + 1}`,
                 actionId: action.actionId || "",
                 actionName: action.type?.name || `Action ${index + 1}`,
-                metadata: {
-                  description:
-                    actionMetadata.description || action.type?.name || "",
-                  message: actionMetadata.message || "",
-                },
+                metadata: actionMetadata, // Pass the complete metadata object
                 onRename: (newName: string) =>
                   handleRenameNode(actionId, newName),
                 onDelete: () => handleDeleteNode(actionId),
@@ -2069,6 +2065,16 @@ const ZapEditor = forwardRef<
     // Update the saveZapToBackend function
     const saveZapToBackend = async () => {
       try {
+        // Validate the zap first
+        const errors = validateZap();
+
+        if (errors.length > 0) {
+          // Show validation errors
+          setValidationErrors(errors);
+          setShowValidationDialog(true);
+          return; // Don't proceed with saving
+        }
+
         setIsSaving(true);
         setSaveError(null);
         setSaveSuccess(false);
@@ -2106,13 +2112,19 @@ const ZapEditor = forwardRef<
         console.log("Using trigger ID for save:", mappedTriggerId);
 
         // Handle both object and string metadata formats for trigger
-        const triggerMetadata =
+        let triggerMetadata =
           typeof triggerNode.data.metadata === "object"
             ? triggerNode.data.metadata
             : {
                 description: triggerNode.data.label || "",
-                message: triggerNode.data.metadata || "",
+                // Don't add message field
               };
+
+        // Remove message field from trigger metadata if present
+        if (triggerMetadata && triggerMetadata.message !== undefined) {
+          const { message, ...cleanTriggerMetadata } = triggerMetadata;
+          triggerMetadata = cleanTriggerMetadata;
+        }
 
         // Create the actions array, ensuring no action uses the trigger ID
         const actionsWithUniqueIds = actionNodes.map((node) => {
@@ -2133,15 +2145,11 @@ const ZapEditor = forwardRef<
               ? node.data.metadata
               : {
                   description: node.data.label || "",
-                  message: node.data.metadata || "",
+                  // Don't add the message field at all
                 };
 
-          // Remove message field for email actions that use the new metadata structure
-          if (
-            actionMetadata &&
-            actionMetadata["action event"] &&
-            actionMetadata.data
-          ) {
+          // Remove message field for any action type
+          if (actionMetadata && actionMetadata.message !== undefined) {
             // Make sure we use a clean copy without the message field
             const { message, ...cleanMetadata } = actionMetadata;
             actionMetadata = cleanMetadata;
@@ -3009,6 +3017,107 @@ const ZapEditor = forwardRef<
       }
     }, [isInitialLoadComplete, nodes, edges, updateNodeConnections]);
 
+    // Add this state and function to the component
+
+    // State to track validation errors
+    const [validationErrors, setValidationErrors] = useState<string[]>([]);
+    const [showValidationDialog, setShowValidationDialog] = useState(false);
+
+    // Validate an individual node
+    const validateNode = (node: Node): string | null => {
+      // For trigger nodes, check if it's a webhook and has received data
+      if (node.type === "trigger") {
+        // If it's a webhook trigger, check if there's webhook response data
+        if (node.data?.actionId === "ed63b01b-87ca-45a3-86f0-ba37d2c40235") {
+          // Webhook trigger ID
+          // Get webhook metadata
+          const metadata = node.data?.metadata || {};
+
+          // Check if this node has received webhook data
+          if (
+            !(
+              metadata.webhookDataReceived ||
+              metadata.webhookTestCompleted ||
+              (metadata.webhook && metadata.webhook.testCompleted)
+            )
+          ) {
+            return `Webhook Trigger: No webhook data received. Send a test request to your webhook URL first.`;
+          }
+        }
+        return null;
+      }
+
+      // Email action validation
+      if (node.data?.actionId === "34e430af-d860-4cb9-b71a-a26fa89f396c") {
+        // Email action ID
+        const metadata = node.data?.metadata || {};
+        const data = metadata.data || {};
+        const actionName = node.data?.actionName || "Email";
+        const nodeDescription = node.data?.metadata?.description || actionName;
+
+        // Check if email has required fields
+        if (
+          !Array.isArray(data.recipients) ||
+          data.recipients.length === 0 ||
+          data.recipients.some((r: string) => !r || r.trim() === "")
+        ) {
+          return `${nodeDescription}: Recipients are required`;
+        }
+
+        if (!data.subject || data.subject.trim() === "") {
+          return `${nodeDescription}: Subject is required`;
+        }
+
+        if (!data.body || data.body.trim() === "") {
+          return `${nodeDescription}: Email body is required`;
+        }
+      }
+
+      return null;
+    };
+
+    // Validate the entire zap flow
+    const validateZap = (): string[] => {
+      const errors: string[] = [];
+
+      // Make sure we have at least one action
+      if (nodes.length <= 1) {
+        errors.push("Your zap needs at least one action");
+        return errors;
+      }
+
+      // Validate each node
+      const orderedNodes = getOrderedNodes();
+      orderedNodes.forEach((node) => {
+        const error = validateNode(node);
+        if (error) {
+          errors.push(error);
+        }
+      });
+
+      return errors;
+    };
+
+    // Handle publish button click
+    const handlePublish = () => {
+      // Validate the zap first
+      const errors = validateZap();
+
+      if (errors.length > 0) {
+        // Show validation errors
+        setValidationErrors(errors);
+        setShowValidationDialog(true);
+      } else {
+        // No errors, proceed with saving
+        saveZapToBackend();
+      }
+    };
+
+    // Handle closing the validation dialog
+    const handleCloseValidationDialog = () => {
+      setShowValidationDialog(false);
+    };
+
     return (
       <div className="flex flex-col h-[85vh] bg-zinc-950 overflow-hidden">
         {/* Header */}
@@ -3124,34 +3233,10 @@ const ZapEditor = forwardRef<
             )}
             <button
               className="px-4 py-2 bg-yellow-600 text-black rounded-md font-mono font-bold hover:bg-yellow-500 transition-colors flex items-center"
-              onClick={saveZapToBackend}
-              disabled={isSaving || isClearing || deleteDialogState.isLoading}
+              onClick={handlePublish}
+              disabled={isSaving || isDeleting || isClearing}
             >
-              {deleteDialogState.isLoading ? (
-                <>
-                  <svg
-                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-black"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  Publishing...
-                </>
-              ) : isSaving ? (
+              {isSaving ? (
                 <>
                   <svg
                     className="animate-spin -ml-1 mr-2 h-4 w-4 text-black"
@@ -3176,7 +3261,22 @@ const ZapEditor = forwardRef<
                   Publishing...
                 </>
               ) : (
-                <>Publish Zap</>
+                <>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="w-4 h-4 mr-2"
+                  >
+                    <path d="M5 12h14" />
+                    <path d="M12 5l7 7-7 7" />
+                  </svg>
+                  Publish
+                </>
               )}
             </button>
           </div>
@@ -3581,6 +3681,44 @@ const ZapEditor = forwardRef<
             </div>
           </Modal>
         )}
+
+        {/* Validation Error Dialog */}
+        <div
+          className={`fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/50 ${
+            showValidationDialog ? "block" : "hidden"
+          }`}
+        >
+          <div className="bg-zinc-900 border border-red-500/30 rounded-lg shadow-2xl w-[450px] overflow-hidden">
+            <div className="p-4 border-b border-red-500/30">
+              <h3 className="text-lg font-bold text-white font-mono">
+                Configuration Required
+              </h3>
+            </div>
+            <div className="p-6 text-zinc-300">
+              <div className="mb-4">
+                <p className="font-mono text-sm mb-4">
+                  Please complete the configuration for your zap before
+                  publishing:
+                </p>
+                <ul className="list-disc pl-5 space-y-2 text-xs">
+                  {validationErrors.map((error, index) => (
+                    <li key={index} className="text-red-400">
+                      {error}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 p-4 bg-zinc-950">
+              <button
+                onClick={handleCloseValidationDialog}
+                className="px-4 py-2 bg-zinc-800 text-zinc-300 font-medium rounded hover:bg-zinc-700 transition-colors font-mono"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

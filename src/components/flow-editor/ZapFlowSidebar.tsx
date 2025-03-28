@@ -4,6 +4,49 @@ import React, { useMemo } from "react";
 import { Node, Edge } from "reactflow";
 import { ActionIcon } from "@/utils/iconMapping";
 
+// Define a helper function to validate node configuration
+const isNodeFullyConfigured = (node: Node): boolean => {
+  // For trigger nodes, check if it's a webhook and has received data
+  if (node.type === "trigger") {
+    // If it's a webhook trigger, check if there's webhook response data
+    if (node.data?.actionId === "ed63b01b-87ca-45a3-86f0-ba37d2c40235") {
+      // Webhook trigger ID
+      // Get webhook metadata
+      const metadata = node.data?.metadata || {};
+
+      // Check if this node has a webhookDataReceived flag or webhookTestCompleted flag
+      return !!(
+        metadata.webhookDataReceived ||
+        metadata.webhookTestCompleted ||
+        (metadata.webhook && metadata.webhook.testCompleted)
+      );
+    }
+
+    // For other triggers, assume they're valid
+    return true;
+  }
+
+  // Email action validation
+  if (node.data?.actionId === "34e430af-d860-4cb9-b71a-a26fa89f396c") {
+    // Email action ID
+    const metadata = node.data?.metadata || {};
+    const data = metadata.data || {};
+
+    // Check if email has required fields
+    const hasRecipients =
+      Array.isArray(data.recipients) &&
+      data.recipients.length > 0 &&
+      data.recipients.every((r: string) => r.trim() !== "");
+    const hasSubject = !!data.subject && data.subject.trim() !== "";
+    const hasBody = !!data.body && data.body.trim() !== "";
+
+    return hasRecipients && hasSubject && hasBody;
+  }
+
+  // Default to true for other action types until we implement their validation
+  return true;
+};
+
 interface ZapFlowSidebarProps {
   nodes: Node[];
   edges: Edge[];
@@ -80,6 +123,7 @@ const ZapFlowSidebar: React.FC<ZapFlowSidebarProps> = ({
         {sortedNodes.map((node, index) => {
           const isTrigger = node.type === "trigger";
           const isActive = node.id === activeNodeId;
+          const isConfigured = isNodeFullyConfigured(node);
 
           return (
             <button
@@ -117,7 +161,7 @@ const ZapFlowSidebar: React.FC<ZapFlowSidebarProps> = ({
                     isTrigger ? "text-purple-400" : "text-white"
                   }`}
                 />
-                <div className="flex flex-col">
+                <div className="flex flex-col flex-1">
                   <span
                     className={`text-sm truncate ${
                       isTrigger ? "text-purple-200 font-medium" : "text-white"
@@ -131,6 +175,45 @@ const ZapFlowSidebar: React.FC<ZapFlowSidebarProps> = ({
                         {node.data.label}
                       </span>
                     )}
+                </div>
+
+                {/* Status indicator */}
+                <div className="ml-2 flex-shrink-0">
+                  {isConfigured ? (
+                    <div className="w-5 h-5 rounded-full flex items-center justify-center bg-green-500/20 text-green-400">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="w-3.5 h-3.5"
+                      >
+                        <path d="M20 6L9 17l-5-5" />
+                      </svg>
+                    </div>
+                  ) : (
+                    <div
+                      className="w-5 h-5 rounded-full flex items-center justify-center bg-orange-500/20 text-orange-400"
+                      title="Configuration required"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="w-3.5 h-3.5"
+                      >
+                        <path d="M12 9v2m0 4h.01" />
+                        <path d="M12 2a10 10 0 100 20 10 10 0 000-20z" />
+                      </svg>
+                    </div>
+                  )}
                 </div>
               </div>
             </button>
