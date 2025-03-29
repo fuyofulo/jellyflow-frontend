@@ -19,6 +19,8 @@ export const API_ENDPOINTS = {
   // Auth
   SIGNIN: "/api/v1/user/signin",
   SIGNUP: "/api/v1/user/signup",
+  VERIFY_EMAIL: "/api/v1/verify/verify-email",
+  RESEND_VERIFICATION: "/api/v1/verify/resend-verification",
 
   // Zaps
   ZAPS: "/api/v1/zap/",
@@ -35,7 +37,4 @@ export const API_ENDPOINTS = {
   // Services
   AVAILABLE_TRIGGERS: "/api/v1/trigger/available",
   AVAILABLE_ACTIONS: "/api/v1/action/available",
-
-  // Health
-  HEALTH: "/health",
 };

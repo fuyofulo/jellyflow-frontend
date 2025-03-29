@@ -8,6 +8,7 @@ import Link from "next/link";
 import { UnauthenticatedNavbar } from "../navigation/Navbar";
 import { useEnvironment } from "@/hooks/useEnvironment";
 import { buildApiUrl, API_ENDPOINTS } from "@/utils/api";
+import { removeToken } from "@/utils/auth";
 
 const Signup = () => {
   const router = useRouter();
@@ -106,33 +107,26 @@ const Signup = () => {
       });
 
       const data = await response.json();
+      console.log("Signup response status:", response.status);
+      console.log("Signup response data:", data);
 
       // Handle different status codes from the backend
       if (response.status === 409) {
         // User already exists
         throw new Error(data.message || "User with this email already exists");
-      } else if (response.status === 201) {
-        // User created successfully
+      } else if (
+        response.ok ||
+        (data && data.message && data.message.includes("verification"))
+      ) {
+        // User created successfully or verification code sent
         console.log("Signup successful:", data);
 
-        // Show success message and redirect
-        setTimeout(() => {
-          router.push("/signin?newAccount=true");
-        }, 1000);
+        // Clear any existing tokens before redirecting to verification
+        removeToken();
 
-        // Use a more user-friendly way to notify user of success
-        const successDiv = document.createElement("div");
-        successDiv.className =
-          "mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative";
-        successDiv.textContent =
-          "Account created successfully! Redirecting to login page...";
-
-        // Insert success message at the top of the form
-        const formElement = document.querySelector("form");
-        if (formElement && formElement.parentNode) {
-          formElement.parentNode.insertBefore(successDiv, formElement);
-        }
-      } else if (!response.ok) {
+        // Redirect to verification page
+        router.push(`/verify?email=${encodeURIComponent(formData.email)}`);
+      } else {
         // Handle other error responses
         const errorMessage = data.message || "Failed to create account";
         throw new Error(errorMessage);
