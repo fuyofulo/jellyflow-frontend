@@ -3,9 +3,11 @@ import { WebhookPanel } from "./index";
 import { EmailPanel } from "./index";
 import { DatabasePanel } from "./index";
 import { DefaultPanel } from "./index";
+import { TelegramPanel } from "./index";
 
 // Debug log to check if EmailPanel is imported correctly
 console.log("EmailPanel imported:", !!EmailPanel);
+console.log("TelegramPanel imported:", !!TelegramPanel);
 
 /**
  * Map of app IDs to their specific panel components
@@ -28,6 +30,9 @@ export const APP_PANELS: Record<string, React.FC<BaseMetadataPanelProps>> = {
   gmail: EmailPanel,
   mail: EmailPanel,
 
+  // Telegram panels
+  telegram: TelegramPanel,
+
   // Database panels
   database: DatabasePanel,
   db: DatabasePanel,
@@ -41,6 +46,10 @@ export const APP_PANELS: Record<string, React.FC<BaseMetadataPanelProps>> = {
 
 // Debug log to check if EmailPanel is registered correctly
 console.log("Email panel registration:", APP_PANELS["email"] === EmailPanel);
+console.log(
+  "Telegram panel registration:",
+  APP_PANELS["telegram"] === TelegramPanel
+);
 
 /**
  * Function to get the appropriate panel for an app

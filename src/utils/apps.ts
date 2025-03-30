@@ -80,6 +80,12 @@ export const fallbackApps: App[] = [
     category: "action",
   },
   {
+    id: "telegram",
+    name: "Telegram",
+    description: "Send messages through Telegram",
+    category: "action",
+  },
+  {
     id: "email",
     name: "Email",
     description: "Send and receive emails",

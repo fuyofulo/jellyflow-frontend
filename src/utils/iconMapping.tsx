@@ -11,6 +11,7 @@ import { SlackSVG } from "../components/logos/SlackSVG";
 import { SolanaSVG } from "../components/logos/SolanaSVG";
 import WebhookSVG from "../components/logos/WebhookSVG";
 import { XSVG } from "../components/logos/XSVG";
+import TelegramSVG from "../components/logos/TelegramSVG";
 import { IconWrapper } from "../components/IconWrapper";
 import {
   fetchAvailableActions,
@@ -34,6 +35,7 @@ export const IconMapping: Record<string, IconComponent> = {
   // Communication/Email
   email: MailSVG,
   gmail: OfficialGmailSVG,
+  telegram: TelegramSVG,
 
   // AI Services
   chatgpt: ChatGPTSVG,
@@ -83,6 +85,7 @@ const initializeActionIdMapping = () => {
     twitter: "x",
     x: "x",
     email: "email",
+    telegram: "telegram",
     // Add common UUIDs for services we know about
     "f4b74660-98e4-46b3-856a-1b4b1423c722": "email",
     "7fbe85fc-5a12-4103-8d00-264f117aaf37": "slack",

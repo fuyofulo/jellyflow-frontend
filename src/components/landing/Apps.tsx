@@ -10,6 +10,7 @@ import SolanaSVG from "../logos/SolanaSVG";
 import EthereumSVG from "../logos/EthereumSVG";
 import XSVG from "../logos/XSVG";
 import ChatGPTSVG from "../logos/ChatGPTSVG";
+import TelegramSVG from "../logos/TelegramSVG";
 interface AppsProps {
   textPosition?: "top" | "bottom"; // Makes text position configurable
 }
@@ -24,7 +25,7 @@ export const Apps: React.FC<AppsProps> = ({ textPosition = "bottom" }) => {
     { name: "Ethereum", logo: <EthereumSVG /> },
     { name: "X", logo: <XSVG /> },
     { name: "Notion", logo: <NotionSVG /> },
-    { name: "Drive", logo: <DriveSVG /> },
+    { name: "Telegram", logo: <TelegramSVG /> },
     { name: "ChatGPT", logo: <ChatGPTSVG /> }
   ];
 

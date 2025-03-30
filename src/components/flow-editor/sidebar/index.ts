@@ -3,6 +3,7 @@ export { default as DefaultPanel } from "./DefaultPanel";
 export { default as WebhookPanel } from "./WebhookPanel";
 export { default as EmailPanel } from "./EmailPanel";
 export { default as DatabasePanel } from "./DatabasePanel";
+export { default as TelegramPanel } from "./TelegramPanel";
 export { default as PanelFactory } from "./PanelFactory";
 
 // Export app panel utilities
