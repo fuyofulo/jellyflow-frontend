@@ -52,6 +52,9 @@ Jellyflow is a powerful no-code workflow automation platform that allows users t
    # Backend API URL (required)
    NEXT_PUBLIC_BACKEND_URL=http://localhost:3033
 
+   # Webhook Service URL (required for webhook triggers)
+   NEXT_PUBLIC_WEBHOOK_URL=http://localhost:4000
+
    # Environment (development, production, etc.)
    NODE_ENV=development
    ```
