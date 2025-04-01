@@ -145,8 +145,8 @@ export const UnauthenticatedNavbar = () => {
 
         {/* Middle section - Navigation links */}
         <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center space-x-1">
-          <Button7>Pricing</Button7>
-          <Button7>Docs</Button7>
+          {/* <Button7>Pricing</Button7> */}
+          <Button7>Github</Button7>
           <Button7>Twitter</Button7>
           <Link href="/contact">
             <Button7>Contact</Button7>

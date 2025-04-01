@@ -7,16 +7,33 @@ import { AuthenticatedNavbar } from "@/components/navigation/Navbar";
 import { removeToken, getAuthHeaders } from "@/utils/auth";
 import { buildApiUrl, API_ENDPOINTS } from "@/utils/api";
 
+interface ZapData {
+  id: string;
+  name: string;
+  nodes: Array<{
+    id: string;
+    type: string;
+    data: Record<string, unknown>;
+  }>;
+  edges: Array<{
+    id: string;
+    source: string;
+    target: string;
+  }>;
+}
+
 export default function EditZapPage() {
   const router = useRouter();
   const params = useParams();
   const zapId = params.zapId as string;
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [zapData, setZapData] = useState<any>(null);
-  const editorRef = useRef<{ handleCustomNavigation?: (url: string) => void }>(
-    {}
-  );
+  const [zapData, setZapData] = useState<ZapData | null>(null);
+  const editorRef = useRef<{ handleCustomNavigation: (url: string) => void }>({
+    handleCustomNavigation: (url: string) => {
+      router.push(url);
+    },
+  });
 
   useEffect(() => {
     const fetchZapData = async () => {

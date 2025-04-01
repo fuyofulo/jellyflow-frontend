@@ -8,9 +8,11 @@ import { removeToken } from "@/utils/auth";
 
 export default function ZapEditorPage() {
   const router = useRouter();
-  const editorRef = useRef<{ handleCustomNavigation?: (url: string) => void }>(
-    {}
-  );
+  const editorRef = useRef<{ handleCustomNavigation: (url: string) => void }>({
+    handleCustomNavigation: (url: string) => {
+      router.push(url);
+    },
+  });
 
   const handleSignout = () => {
     removeToken();

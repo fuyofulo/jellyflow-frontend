@@ -1,25 +1,29 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Node } from "reactflow";
+import React, { useState, useEffect, useCallback } from "react";
+import { Node, useReactFlow } from "reactflow";
+import { ZapNodeData } from "@/types/zap";
+import ZapEditor from "@/components/pages/ZapEditor";
+import { ZapData } from "@/types/zap";
 import { apps } from "@/utils/apps";
 import { PanelFactory } from "./sidebar";
 
 interface MetadataPanelProps {
   node: Node;
   onBack: () => void;
-  onMetadataChange?: (nodeId: string, metadata: Record<string, any>) => void;
+  onMetadataChange?: (
+    nodeId: string,
+    metadata: Record<string, unknown>
+  ) => void;
 }
 
-const MetadataPanel: React.FC<MetadataPanelProps> = ({
+export function MetadataPanel({
   node,
   onBack,
   onMetadataChange,
-}) => {
-  const isTrigger = node.type === "trigger";
-  const actionId = node.data?.actionId || "";
-
+}: MetadataPanelProps) {
   // Find the app description from apps.ts
+  const actionId = node.data?.actionId || "";
   const appInfo = apps.find((app) => app.id === actionId);
   const appDescription = appInfo?.description || "";
 
@@ -35,7 +39,6 @@ const MetadataPanel: React.FC<MetadataPanelProps> = ({
 
   // Create local state to track input values
   const [descriptionValue, setDescriptionValue] = useState(description);
-  const [metadataValue, setMetadataValue] = useState("");
 
   // Update values if node changes
   useEffect(() => {
@@ -49,46 +52,8 @@ const MetadataPanel: React.FC<MetadataPanelProps> = ({
 
       // Update description field
       setDescriptionValue(currentDescription);
-
-      // Get message from the metadata object if it exists
-      let message = "";
-      if (node.data?.metadata) {
-        if (typeof node.data.metadata === "object") {
-          message = node.data.metadata.message || "";
-        } else {
-          // Handle legacy string metadata
-          message = node.data.metadata;
-        }
-      }
-
-      // Update message field with the extracted value
-      setMetadataValue(message);
     }
   }, [node, node.id, appDescription, node.data?.metadata, node.data?.label]);
-
-  // Define a metadata change handler that preserves the basic metadata fields
-  const handleAppSpecificMetadataChange = (
-    nodeId: string,
-    updates: Record<string, any>
-  ) => {
-    if (onMetadataChange) {
-      // Ensure we preserve the basic metadata structure
-      const currentMetadata =
-        typeof node.data?.metadata === "object"
-          ? node.data.metadata
-          : { description: descriptionValue, message: metadataValue };
-
-      // Merge the app-specific updates with basic metadata
-      const mergedUpdates = {
-        metadata: {
-          ...currentMetadata,
-          ...(updates.metadata || {}),
-        },
-      };
-
-      onMetadataChange(nodeId, mergedUpdates);
-    }
-  };
 
   return (
     <div className="bg-black border-l border-zinc-800 flex flex-col h-full">
@@ -126,11 +91,10 @@ const MetadataPanel: React.FC<MetadataPanelProps> = ({
         {/* App-specific settings using PanelFactory */}
         <PanelFactory
           node={node}
-          onMetadataChange={handleAppSpecificMetadataChange}
+          onMetadataChange={onMetadataChange}
+          onBack={onBack}
         />
       </div>
     </div>
   );
-};
-
-export default MetadataPanel;
+}

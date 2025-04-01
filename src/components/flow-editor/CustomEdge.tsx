@@ -23,11 +23,8 @@ export const CustomEdge = ({
   targetPosition,
   style = {},
   markerEnd,
-  source,
-  target,
-  data,
 }: CustomEdgeProps) => {
-  const [edgePath, centerX, centerY] = getBezierPath({
+  const [edgePath] = getBezierPath({
     sourceX,
     sourceY,
     sourcePosition,
@@ -35,13 +32,6 @@ export const CustomEdge = ({
     targetY,
     targetPosition,
   });
-
-  const handleAddClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (data?.onAddNode && source && target) {
-      data.onAddNode(source, target, { x: centerX, y: centerY });
-    }
-  };
 
   return (
     <path

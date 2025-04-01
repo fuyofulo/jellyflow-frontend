@@ -4,19 +4,13 @@ import React, { useCallback, useState } from "react";
 import ReactFlow, {
   Background,
   Controls,
-  MiniMap,
-  useNodesState,
-  useEdgesState,
-  addEdge,
   Connection,
   Edge,
   Node,
   NodeChange,
   EdgeChange,
   NodeTypes,
-  EdgeTypes,
   MarkerType,
-  ConnectionLineType,
   BackgroundVariant,
 } from "reactflow";
 import "reactflow/dist/style.css";
@@ -59,10 +53,6 @@ const FlowEditor: React.FC<FlowEditorProps> = ({
   onNodeClick,
 }) => {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
-  const [isAddingNode, setIsAddingNode] = useState(false);
-  const [addNodePosition, setAddNodePosition] = useState({ x: 0, y: 0 });
-  const [sourceNodeId, setSourceNodeId] = useState<string | null>(null);
-  const [targetNodeId, setTargetNodeId] = useState<string | null>(null);
 
   // Custom edge types
   const edgeTypes = {
@@ -223,9 +213,6 @@ const FlowEditor: React.FC<FlowEditorProps> = ({
           variant={"dots" as BackgroundVariant}
         />
         <Controls showInteractive={false} />
-
-        <Background color="#333" gap={16} />
-        <Controls />
       </ReactFlow>
     </div>
   );

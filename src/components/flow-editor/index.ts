@@ -1,5 +1,5 @@
 // Core flow editor components
-export { default as MetadataPanel } from "./MetadataPanel";
+export { MetadataPanel } from "./MetadataPanel";
 export { default as ZapFlowSidebar } from "./ZapFlowSidebar";
 export { default as TriggerNode } from "./TriggerNode";
 export { default as ActionNode } from "./ActionNode";

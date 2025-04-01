@@ -15,12 +15,6 @@ const GetStartedButton = () => {
           </ButtonWithIcon>
         </Link>
       </div>
-
-      <div className="mt-4">
-        <ButtonWithIcon icon={<GoogleSVG />}>
-          Get Started with Google
-        </ButtonWithIcon>
-      </div>
     </div>
   );
 };

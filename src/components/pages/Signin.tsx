@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import GoogleSVG from "../logos/GoogleSVG";
 import { ButtonWithIcon } from "../buttons/ButtonWithIcon";
@@ -10,61 +10,52 @@ import { UnauthenticatedNavbar } from "../navigation/Navbar";
 import { useEnvironment } from "@/hooks/useEnvironment";
 import { buildApiUrl, API_ENDPOINTS } from "@/utils/api";
 
-const Signin = () => {
+export default function Signin() {
   const router = useRouter();
-  const { backendUrl, backendStatus } = useEnvironment();
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  });
-
-  const [errors, setErrors] = useState({
-    email: "",
-    password: "",
-  });
-
+  const { backendUrl } = useEnvironment();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [apiError, setApiError] = useState("");
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    if (name === "email") {
+      setEmail(value);
+    } else if (name === "password") {
+      setPassword(value);
+    }
     // Clear error when user starts typing
-    if (errors[name as keyof typeof errors]) {
-      setErrors({
-        ...errors,
-        [name]: "",
-      });
+    if (error) {
+      setError(null);
     }
   };
 
   const validateForm = () => {
     let valid = true;
-    const newErrors = { ...errors };
 
     // Validate email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!formData.email.trim()) {
-      newErrors.email = "Email is required";
+    if (!email.trim()) {
+      setError("Email is required");
       valid = false;
-    } else if (!emailRegex.test(formData.email)) {
-      newErrors.email = "Invalid email format";
+    } else if (!emailRegex.test(email)) {
+      setError("Invalid email format");
       valid = false;
     }
 
     // Validate password
-    if (!formData.password) {
-      newErrors.password = "Password is required";
+    if (!password) {
+      setError("Password is required");
       valid = false;
     }
 
-    setErrors(newErrors);
     return valid;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setApiError("");
+    setError(null);
 
     if (!validateForm()) {
       return;
@@ -80,7 +71,7 @@ const Signin = () => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ email, password }),
       });
 
       const data = await response.json();
@@ -111,7 +102,7 @@ const Signin = () => {
         throw new Error("No authentication token received");
       }
     } catch (error) {
-      setApiError(error instanceof Error ? error.message : "An error occurred");
+      setError(error instanceof Error ? error.message : "An error occurred");
       console.error("Signin error:", error);
     } finally {
       setIsLoading(false);
@@ -131,9 +122,9 @@ const Signin = () => {
 
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
           <div className="bg-zinc-900 py-8 px-4 shadow sm:rounded-lg sm:px-10 border border-yellow-600/30">
-            {apiError && (
+            {error && (
               <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
-                <span className="block sm:inline">{apiError}</span>
+                <span className="block sm:inline">{error}</span>
               </div>
             )}
 
@@ -152,13 +143,10 @@ const Signin = () => {
                     type="email"
                     autoComplete="email"
                     required
-                    value={formData.email}
+                    value={email}
                     onChange={handleChange}
                     className="appearance-none block w-full px-3 py-2 border border-gray-700 rounded-md shadow-sm placeholder-gray-500 bg-zinc-800 text-white focus:outline-none focus:ring-yellow-600 focus:border-yellow-600"
                   />
-                  {errors.email && (
-                    <p className="mt-2 text-sm text-red-500">{errors.email}</p>
-                  )}
                 </div>
               </div>
 
@@ -176,15 +164,10 @@ const Signin = () => {
                     type="password"
                     autoComplete="current-password"
                     required
-                    value={formData.password}
+                    value={password}
                     onChange={handleChange}
                     className="appearance-none block w-full px-3 py-2 border border-gray-700 rounded-md shadow-sm placeholder-gray-500 bg-zinc-800 text-white focus:outline-none focus:ring-yellow-600 focus:border-yellow-600"
                   />
-                  {errors.password && (
-                    <p className="mt-2 text-sm text-red-500">
-                      {errors.password}
-                    </p>
-                  )}
                 </div>
               </div>
 
@@ -260,6 +243,4 @@ const Signin = () => {
       </div>
     </div>
   );
-};
-
-export default Signin;
+}

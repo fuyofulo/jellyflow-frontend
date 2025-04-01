@@ -32,7 +32,7 @@ export const Apps: React.FC<AppsProps> = ({ textPosition = "bottom" }) => {
   const integrationText = (
     <div className="text-center mb-2 mt-10">
       <h2 className="text-2xl font-mono font-bold text-white">
-        We support integration with over 9+ apps
+        We support integration with over 10+ apps
       </h2>
     </div>
   );

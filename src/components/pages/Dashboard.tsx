@@ -1,7 +1,6 @@
 "use client";
 import React, { useCallback, useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   getAuthHeaders,
   handleAuthError,
@@ -62,7 +61,6 @@ const Dashboard = () => {
   const [error, setError] = useState("");
   const [username, setUsername] = useState("");
   const [selectedZaps, setSelectedZaps] = useState<Record<string, boolean>>({});
-  const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteDialogState, setDeleteDialogState] = useState({
     isSuccess: false,

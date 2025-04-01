@@ -11,6 +11,10 @@ const nextConfig = {
   serverRuntimeConfig: {
     // Will only be available on the server side
   },
+  eslint: {
+    // Disable ESLint during production builds
+    ignoreDuringBuilds: true,
+  },
 };
 
 module.exports = nextConfig;

@@ -42,11 +42,18 @@ Jellyflow is a powerful no-code workflow automation platform that allows users t
    npm install
    ```
 
-3. Create a `.env.local` file in the root directory with the following variables:
+3. Create a `.env` file in the root directory with the following variables:
 
    ```
+   # Clerk authentication keys
+   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+   CLERK_SECRET_KEY=your_clerk_secret_key
+
    # Backend API URL (required)
    NEXT_PUBLIC_BACKEND_URL=http://localhost:3033
+
+   # Environment (development, production, etc.)
+   NODE_ENV=development
    ```
 
 4. Start the development server:
@@ -82,7 +89,7 @@ jellyflow-frontend/
 │   │   └── ui/          # Reusable UI components
 │   ├── data/            # Static data and configurations
 │   └── utils/           # Utility functions and API clients
-├── .env.local           # Local environment variables
+├── .env                 # Environment variables
 └── package.json         # Project dependencies and scripts
 ```
 

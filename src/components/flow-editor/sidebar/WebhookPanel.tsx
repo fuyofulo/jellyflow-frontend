@@ -617,7 +617,7 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
             <div className="pl-4">
               {keys.map((key, index) => (
                 <div key={key} className="flex">
-                  <span className="text-purple-400">"{key}"</span>
+                  <span className="text-purple-400">&quot;{key}&quot;</span>
                   <span className="text-white mx-1">:</span>
                   <span>
                     {renderJsonValue(value[key], depth + 1)}
@@ -631,7 +631,7 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
         );
       }
     } else if (typeof value === "string") {
-      return <span className="text-green-400">"{value}"</span>;
+      return <span className="text-green-400">&quot;{value}&quot;</span>;
     } else if (typeof value === "number") {
       return <span className="text-yellow-400">{value}</span>;
     } else if (typeof value === "boolean") {
