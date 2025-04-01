@@ -7,9 +7,14 @@
  * @returns The configured backend URL or a default fallback
  */
 export const getBackendUrl = (): string => {
-  // Use environment variable with fallback
-  const backendUrl =
-    process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3033";
+  // Temporarily hardcode URL to fix connection issues
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+  if (!backendUrl) {
+    throw new Error("Backend URL not configured");
+  }
+
+  // Debug log to see what URL is being used
+  console.log("[ENV] Using hardcoded backend URL:", backendUrl);
 
   // Ensure URL doesn't have trailing slash for consistency in path concatenation
   return backendUrl.endsWith("/") ? backendUrl.slice(0, -1) : backendUrl;
@@ -20,9 +25,14 @@ export const getBackendUrl = (): string => {
  * @returns The configured webhook URL or a default fallback using port 4000
  */
 export const getWebhookUrl = (): string => {
-  // Use environment variable with fallback
-  const webhookUrl =
-    process.env.NEXT_PUBLIC_WEBHOOK_URL || "http://localhost:4000";
+  // Temporarily hardcode URL to fix connection issues
+  const webhookUrl = process.env.NEXT_PUBLIC_WEBHOOK_URL;
+  if (!webhookUrl) {
+    throw new Error("Webhook URL not configured");
+  }
+
+  // Debug log to see what URL is being used
+  console.log("[ENV] Using hardcoded webhook URL:", webhookUrl);
 
   // Ensure URL doesn't have trailing slash for consistency in path concatenation
   return webhookUrl.endsWith("/") ? webhookUrl.slice(0, -1) : webhookUrl;

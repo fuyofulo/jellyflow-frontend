@@ -5,8 +5,17 @@ import { BaseMetadataPanelProps } from "./BaseMetadataPanel";
 import { ActionIcon } from "@/utils/iconMapping";
 import { buildApiUrl, API_ENDPOINTS } from "@/utils/api";
 import { getToken, getAuthHeaders } from "@/utils/auth";
-import { getBackendUrl, getWebhookUrl } from "@/utils/environment";
 import { CodeBlock } from "@/components/ui/CodeBlock";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const webhookurl = process.env.NEXT_PUBLIC_WEBHOOK_URL;
+const backendurl = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+if (!webhookurl || !backendurl) {
+  throw new Error("Webhook URL or backend URL not configured");
+}
 
 // Type for webhook-specific configuration
 interface WebhookConfig {
@@ -32,6 +41,11 @@ interface WebhookResponse {
   metadata?: any;
   data?: any;
 }
+
+// Helper function to get webhook URL consistently
+const getWebhookUrlRemote = (): string => {
+  return webhookurl;
+};
 
 const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
   node,
@@ -91,7 +105,13 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
         const token = getToken();
         if (!token) return;
 
-        const webhookUrl = getWebhookUrl();
+        // Always use the remote webhook URL
+        const webhookUrl = webhookurl;
+        console.log(
+          "[WebhookPanel] Auto-fetch using remote webhook URL:",
+          webhookUrl
+        );
+
         if (!webhookUrl) return;
 
         // For an existing zap, we need the user ID
@@ -135,9 +155,13 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
 
         if (!userId) return;
 
-        // Construct webhook URL
-        const cleanWebhookUrl = webhookUrl.replace(/\/$/, "");
-        const fullWebhookUrl = `${cleanWebhookUrl}/webhook/catch/${userId}/${zapId}`;
+        // DIRECT HARDCODING of the full webhook URL with remote server
+        // Don't use any dynamic base URL that could come from environment variables
+        const fullWebhookUrl = `${webhookUrl}/webhook/catch/${userId}/${zapId}`;
+        console.log(
+          "[WebhookPanel] FORCING remote webhook URL:",
+          fullWebhookUrl
+        );
 
         // Update webhook config
         const newConfig = {
@@ -263,8 +287,10 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
         throw new Error("Please log in to generate a webhook URL");
       }
 
-      // Get webhook URL
-      const webhookUrl = getWebhookUrl();
+      // Always use the remote webhook URL
+      const webhookUrl = webhookurl;
+      console.log("[WebhookPanel] Using remote webhook URL:", webhookUrl);
+
       if (!webhookUrl) {
         throw new Error("Webhook URL not configured");
       }
@@ -388,9 +414,11 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
         throw new Error("Failed to determine zap ID or user ID");
       }
 
-      // Construct webhook URL
-      const fullWebhookUrl = `${cleanWebhookUrl}/webhook/catch/${userId}/${zapId}`;
-      console.log("Generated webhook URL:", fullWebhookUrl);
+      // DIRECT HARDCODING of the full webhook URL with remote server
+      // Don't use any dynamic base URL that could come from environment variables
+      const fullWebhookUrl = `${webhookUrl}/webhook/catch/${userId}/${zapId}`;
+
+      console.log("[WebhookPanel] FORCING remote webhook URL:", fullWebhookUrl);
 
       // Update the webhook config
       const newConfig = {
@@ -467,8 +495,13 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
         return;
       }
 
-      // Get backend URL
-      const backendUrl = getBackendUrl();
+      // Always use the remote backend URL
+      const backendUrl = backendurl;
+
+      console.log(
+        "[WebhookPanel] Using remote backend URL for fetching responses:",
+        backendUrl
+      );
       if (!backendUrl) {
         setResponseError("Backend URL not configured");
         setIsLoadingResponses(false);

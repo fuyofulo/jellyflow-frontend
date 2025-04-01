@@ -6,14 +6,21 @@ import { ActionIcon } from "@/utils/iconMapping";
 
 // Define a helper function to validate node configuration
 const isNodeFullyConfigured = (node: Node): boolean => {
+  // Check if node has basic metadata
+  if (!node.data?.metadata) {
+    return false;
+  }
+
+  const metadata = node.data.metadata || {};
+  const actionId = node.data?.actionId;
+
   // For trigger nodes, check if it's a webhook and has received data
   if (node.type === "trigger") {
     // If it's a webhook trigger, check if there's webhook response data
-    if (node.data?.actionId === "ed63b01b-87ca-45a3-86f0-ba37d2c40235") {
-      // Webhook trigger ID
-      // Get webhook metadata
-      const metadata = node.data?.metadata || {};
-
+    if (
+      actionId === "ed63b01b-87ca-45a3-86f0-ba37d2c40235" ||
+      node.data?.actionName?.toLowerCase().includes("webhook")
+    ) {
       // Check if this node has a webhookDataReceived flag or webhookTestCompleted flag
       return !!(
         metadata.webhookDataReceived ||
@@ -22,14 +29,15 @@ const isNodeFullyConfigured = (node: Node): boolean => {
       );
     }
 
-    // For other triggers, assume they're valid
-    return true;
+    // For other triggers, check if they have description
+    return !!metadata.description;
   }
 
   // Email action validation
-  if (node.data?.actionId === "34e430af-d860-4cb9-b71a-a26fa89f396c") {
-    // Email action ID
-    const metadata = node.data?.metadata || {};
+  if (
+    actionId === "34e430af-d860-4cb9-b71a-a26fa89f396c" ||
+    node.data?.actionName?.toLowerCase().includes("email")
+  ) {
     const data = metadata.data || {};
 
     // Check if email has required fields
@@ -43,8 +51,48 @@ const isNodeFullyConfigured = (node: Node): boolean => {
     return hasRecipients && hasSubject && hasBody;
   }
 
-  // Default to true for other action types until we implement their validation
-  return true;
+  // Telegram action validation
+  if (
+    actionId === "telegram" ||
+    node.data?.actionName?.toLowerCase().includes("telegram")
+  ) {
+    // Check if Telegram is verified and has a message
+    const isVerified = !!metadata.isVerified;
+    const hasUsername =
+      !!metadata.username &&
+      typeof metadata.username === "string" &&
+      metadata.username.trim() !== "";
+    const hasUserId = !!metadata.userId; // userId might be a number or other non-string type
+    const hasMessage =
+      !!metadata.updateMessage &&
+      typeof metadata.updateMessage === "string" &&
+      metadata.updateMessage.trim() !== "";
+
+    console.log("Telegram node check:", {
+      isVerified,
+      hasUsername,
+      hasUserId,
+      hasMessage,
+    });
+
+    return isVerified && hasUsername && hasUserId && hasMessage;
+  }
+
+  // Database action validation
+  if (
+    actionId === "database" ||
+    node.data?.actionName?.toLowerCase().includes("database")
+  ) {
+    // Check if database configuration is complete
+    const hasConnectionString =
+      !!metadata.connectionString && metadata.connectionString.trim() !== "";
+    const hasQuery = !!metadata.query && metadata.query.trim() !== "";
+
+    return hasConnectionString && hasQuery;
+  }
+
+  // Default check for other action types - at minimum they should have a description
+  return !!metadata.description;
 };
 
 interface ZapFlowSidebarProps {

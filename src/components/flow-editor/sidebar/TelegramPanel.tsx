@@ -5,6 +5,16 @@ import { BaseMetadataPanelProps } from "./BaseMetadataPanel";
 import { ActionIcon } from "@/utils/iconMapping";
 import { buildApiUrl, API_ENDPOINTS } from "@/utils/api";
 import { getAuthHeaders } from "@/utils/auth";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const backendurl = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+if (!backendurl) {
+  throw new Error("Backend URL not configured");
+}
+
 
 // Type for Telegram-specific configuration
 interface TelegramConfig {
@@ -341,10 +351,12 @@ const TelegramPanel: React.FC<BaseMetadataPanelProps> = ({
         return;
       }
 
-      // Make API request to verify Telegram username
-      const BACKEND_URL =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:3033";
-      console.log(`Verifying telegram username: ${telegramConfig.username}`);
+      // Temporarily hardcode backend URL to fix connection issues
+      const BACKEND_URL = backendurl;
+      console.log(
+        `[TelegramPanel] Using backend URL for verification:`,
+        BACKEND_URL
+      );
 
       const response = await fetch(
         `${BACKEND_URL}/api/v1/telegram/verify?username=${telegramConfig.username}`,
@@ -685,7 +697,7 @@ const TelegramPanel: React.FC<BaseMetadataPanelProps> = ({
 
           {/* Show variable selector when updateMessage field is active */}
           {activeField === "updateMessage" && (
-            <div className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md bg-zinc-800 shadow-lg border border-zinc-600">
+            <div className="fixed right-4 mt-1 w-64 max-h-48 overflow-auto rounded-md bg-zinc-800 shadow-lg border border-zinc-600">
               <div className="py-1">
                 {availableVariables.length > 0 ? (
                   availableVariables.map((variable, index) => (
@@ -696,10 +708,10 @@ const TelegramPanel: React.FC<BaseMetadataPanelProps> = ({
                         handleInsertUpdateMessageVariable(variable.path)
                       }
                     >
-                      <span className="font-mono text-xs">
+                      <span className="font-mono text-xs truncate max-w-[100px]">
                         {variable.label}
                       </span>
-                      <span className="text-xs text-zinc-400 truncate max-w-[150px]">
+                      <span className="text-xs text-zinc-400 truncate max-w-[100px] ml-1">
                         {String(variable.value)}
                       </span>
                     </button>

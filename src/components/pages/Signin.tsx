@@ -7,12 +7,18 @@ import { ButtonWithIcon } from "../buttons/ButtonWithIcon";
 import Link from "next/link";
 import { setToken } from "@/utils/auth";
 import { UnauthenticatedNavbar } from "../navigation/Navbar";
-import { useEnvironment } from "@/hooks/useEnvironment";
-import { buildApiUrl, API_ENDPOINTS } from "@/utils/api";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const backendurl = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+if (!backendurl) {
+  throw new Error("Backend URL not configured");
+}
 
 export default function Signin() {
   const router = useRouter();
-  const { backendUrl } = useEnvironment();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -64,9 +70,11 @@ export default function Signin() {
     setIsLoading(true);
 
     try {
-      console.log("Using backend URL:", backendUrl);
+      // Use hardcoded URL for signin
+      const signinUrl = `${backendurl}/api/v1/user/signin`;
+      console.log("Using hardcoded signin URL:", signinUrl);
 
-      const response = await fetch(buildApiUrl(API_ENDPOINTS.SIGNIN), {
+      const response = await fetch(signinUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -208,24 +216,7 @@ export default function Signin() {
               </div>
             </form>
 
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-700"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-zinc-900 text-gray-400 font-mono">
-                    Or
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-6">
-                <ButtonWithIcon icon={<GoogleSVG />}>
-                  Sign in with Google
-                </ButtonWithIcon>
-              </div>
-            </div>
+            
 
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-400 font-mono">

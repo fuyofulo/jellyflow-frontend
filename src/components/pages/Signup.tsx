@@ -6,13 +6,21 @@ import GoogleSVG from "../logos/GoogleSVG";
 import { ButtonWithIcon } from "../buttons/ButtonWithIcon";
 import Link from "next/link";
 import { UnauthenticatedNavbar } from "../navigation/Navbar";
-import { useEnvironment } from "@/hooks/useEnvironment";
 import { buildApiUrl, API_ENDPOINTS } from "@/utils/api";
 import { removeToken } from "@/utils/auth";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const backendurl = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+if (!backendurl) {
+  throw new Error("Backend URL not configured");
+}
 
 export default function Signup() {
   const router = useRouter();
-  const { backendUrl } = useEnvironment();
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -20,12 +28,14 @@ export default function Signup() {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    if (name === "email") {
+    const { name: fieldName, value } = e.target;
+    if (fieldName === "name") {
+      setName(value);
+    } else if (fieldName === "email") {
       setEmail(value);
-    } else if (name === "password") {
+    } else if (fieldName === "password") {
       setPassword(value);
-    } else if (name === "confirmPassword") {
+    } else if (fieldName === "confirmPassword") {
       setConfirmPassword(value);
     }
     // Clear error when user starts typing
@@ -36,6 +46,12 @@ export default function Signup() {
 
   const validateForm = () => {
     let valid = true;
+
+    // Validate name
+    if (!name.trim()) {
+      setError("Name is required");
+      valid = false;
+    }
 
     // Validate email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -76,14 +92,17 @@ export default function Signup() {
     setIsLoading(true);
 
     try {
-      console.log("Using backend URL:", backendUrl);
+      // Use hardcoded API URL for signup
+      const signupUrl = `${backendurl}/api/v1/user/signup`;
+      console.log("Using hardcoded signup URL:", signupUrl);
 
-      const response = await fetch(buildApiUrl(API_ENDPOINTS.SIGNUP), {
+      const response = await fetch(signupUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          name: name,
           email: email,
           password: password,
         }),
@@ -142,6 +161,27 @@ export default function Signup() {
             )}
 
             <form className="space-y-6" onSubmit={handleSubmit}>
+              <div>
+                <label
+                  htmlFor="name"
+                  className="block text-sm font-mono font-medium text-gray-300"
+                >
+                  Name
+                </label>
+                <div className="mt-1">
+                  <input
+                    id="name"
+                    name="name"
+                    type="text"
+                    autoComplete="name"
+                    required
+                    value={name}
+                    onChange={handleChange}
+                    className="appearance-none block w-full px-3 py-2 border border-gray-700 rounded-md shadow-sm placeholder-gray-500 bg-zinc-800 text-white focus:outline-none focus:ring-yellow-600 focus:border-yellow-600"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label
                   htmlFor="email"
@@ -226,12 +266,6 @@ export default function Signup() {
                     Or
                   </span>
                 </div>
-              </div>
-
-              <div className="mt-6">
-                <ButtonWithIcon icon={<GoogleSVG />}>
-                  Sign up with Google
-                </ButtonWithIcon>
               </div>
             </div>
 

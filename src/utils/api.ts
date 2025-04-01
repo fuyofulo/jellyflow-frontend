@@ -1,10 +1,18 @@
-import { getBackendUrl } from "./environment";
+
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const backendurl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 /**
  * Utility to build API URLs consistently
  */
 export const buildApiUrl = (path: string): string => {
-  const backendUrl = getBackendUrl();
+  // ALWAYS use the hardcoded backend URL to ensure remote connections
+  const backendUrl = backendurl;
+
+  console.log("[API] Building URL with hardcoded backend:", backendUrl);
 
   // Ensure path starts with a slash
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;

@@ -3,9 +3,17 @@
 import React, { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { UnauthenticatedNavbar } from "../navigation/Navbar";
-import { buildApiUrl, API_ENDPOINTS } from "@/utils/api";
+import { setToken, removeToken } from "@/utils/auth";
 import VerificationInput from "../inputs/VerificationInput";
-import { removeToken, setToken } from "@/utils/auth";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const backendurl = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+if (!backendurl) {
+  throw new Error("Backend URL not configured");
+}
 
 const Verify = () => {
   const router = useRouter();
@@ -53,7 +61,11 @@ const Verify = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(buildApiUrl(API_ENDPOINTS.VERIFY_EMAIL), {
+      // Use hardcoded URL for verification
+      const verifyUrl = `${backendurl}/api/v1/verify/verify-email`;
+      console.log("Using hardcoded verify URL:", verifyUrl);
+
+      const response = await fetch(verifyUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -94,7 +106,8 @@ const Verify = () => {
           // Try to get user from a different API endpoint or redirect to login with a special flag
           setTimeout(() => {
             // Try to automatically sign in after verification
-            fetch(buildApiUrl(API_ENDPOINTS.SIGNIN), {
+            const signinUrl = `${backendurl}/api/v1/user/signin`;
+            fetch(signinUrl, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ email, autoLogin: true }),
@@ -148,18 +161,19 @@ const Verify = () => {
     setCountdown(60); // 60 seconds cooldown
 
     try {
-      const response = await fetch(
-        buildApiUrl(API_ENDPOINTS.RESEND_VERIFICATION),
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email,
-          }),
-        }
-      );
+      // Use hardcoded URL for resending verification code
+      const resendUrl = `${backendurl}/api/v1/verify/resend-verification`;
+      console.log("Using hardcoded resend URL:", resendUrl);
+
+      const response = await fetch(resendUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+        }),
+      });
 
       const data = await response.json();
 

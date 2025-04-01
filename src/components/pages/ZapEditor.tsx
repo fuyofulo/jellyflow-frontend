@@ -42,8 +42,22 @@ import {
 } from "@/utils/api/availableServices";
 import { v4 as uuidv4 } from "uuid";
 import ConfirmationDialog from "../ui/ConfirmationDialog";
-import { getBackendUrl, getWebhookUrl } from "@/utils/environment";
 import { useMetadataStore } from "@/stores/metadataStore";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const backendurl = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+if (!backendurl) {
+  throw new Error("Backend URL not configured");
+}
+
+const webhookurl = process.env.NEXT_PUBLIC_WEBHOOK_URL;
+
+if (!webhookurl) {
+  throw new Error("Webhook URL not configured");
+}
 
 // Define the App interface
 interface App {
@@ -1655,7 +1669,11 @@ const ZapEditor = forwardRef<
       ) {
         try {
           // Get the webhook URL
-          const webhookBaseUrl = getWebhookUrl();
+          const webhookBaseUrl = webhookurl;
+          console.log(
+            "[ZapEditor] FORCING remote webhook URL:",
+            webhookBaseUrl
+          );
 
           // Get auth token
           const token = getToken();
@@ -1709,12 +1727,13 @@ const ZapEditor = forwardRef<
             }
 
             if (newZapId && userId) {
-              // Ensure the webhook URL doesn't end with a slash
-              const cleanWebhookUrl = webhookBaseUrl.replace(/\/$/, "");
-
-              // Construct the webhook URL
-              webhookUrl = `${cleanWebhookUrl}/webhook/catch/${userId}/${newZapId}`;
-              console.log("Generated webhook URL:", webhookUrl);
+              // DIRECT HARDCODING of the full webhook URL with remote server
+              // Don't use any dynamic base URL that could come from environment variables
+              webhookUrl = `${webhookurl}/webhook/catch/${userId}/${newZapId}`;
+              console.log(
+                "[ZapEditor] FORCING remote webhook URL:",
+                webhookUrl
+              );
             }
           }
         } catch (error) {

@@ -1,14 +1,14 @@
 import React from "react";
 
-const MailSVG = () => {
+const MailSVG = ({ width, height }: { width: number, height: number }) => {
   return (
     <svg
       shapeRendering="geometricPrecision"
       textRendering="geometricPrecision"
       imageRendering="optimizeQuality"
       xmlns="http://www.w3.org/2000/svg"
-      width="20"
-      height="20"
+      width="50"
+      height="50"
       viewBox="7.086 7.087 1277.149 924.008"
     >
       <path fill="none" d="M1138.734 931.095h.283M1139.017 931.095h-.283" />
