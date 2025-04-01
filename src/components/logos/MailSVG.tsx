@@ -1,6 +1,6 @@
 import React from "react";
 
-const MailSVG = ({ width, height }: { width: number, height: number }) => {
+const MailSVG = () => {
   return (
     <svg
       shapeRendering="geometricPrecision"
