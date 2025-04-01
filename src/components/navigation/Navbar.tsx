@@ -75,10 +75,20 @@ export const AuthenticatedNavbar = ({
         {/* Middle section - Navigation links */}
         <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center space-x-1">
           <Button7>Docs</Button7>
-          <Button7>Twitter</Button7>
-          <span onClick={() => handleNavigation("/contact")}>
-            <Button7>Contact</Button7>
-          </span>
+          <a
+            href="https://x.com/fuyofulo"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Button7>Twitter</Button7>
+          </a>
+          <a
+            href="https://github.com/fuyofulo/jellyflow"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Button7>Github</Button7>
+          </a>
         </div>
 
         {/* Right section - User profile */}
@@ -146,11 +156,20 @@ export const UnauthenticatedNavbar = () => {
         {/* Middle section - Navigation links */}
         <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center space-x-1">
           {/* <Button7>Pricing</Button7> */}
-          <Button7>Github</Button7>
-          <Button7>Twitter</Button7>
-          <Link href="/contact">
-            <Button7>Contact</Button7>
-          </Link>
+          <a
+            href="https://github.com/fuyofulo/jellyflow-frontend"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Button7>Github</Button7>
+          </a>
+          <a
+            href="https://x.com/fuyofulo"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Button7>Twitter</Button7>
+          </a>
         </div>
 
         {/* Right section - Sign in and Create Account */}
