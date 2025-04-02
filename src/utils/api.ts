@@ -1,23 +1,32 @@
-
-import dotenv from "dotenv";
-
-dotenv.config();
-
-const backendurl = process.env.NEXT_PUBLIC_BACKEND_URL;
+// Environment variables in Next.js client components are automatically loaded
+// and don't require dotenv for client-side code
+// Client components can only access NEXT_PUBLIC_ prefixed variables
 
 /**
  * Utility to build API URLs consistently
  */
 export const buildApiUrl = (path: string): string => {
-  // ALWAYS use the hardcoded backend URL to ensure remote connections
-  const backendUrl = backendurl;
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
-  console.log("[API] Building URL with hardcoded backend:", backendUrl);
+  if (!backendUrl) {
+    console.error(
+      "Backend URL not configured. Please check your environment variables."
+    );
+    // Return a default that will clearly fail to indicate the missing config
+    return `/api-url-not-configured${path}`;
+  }
+
+  console.log("[API] Building URL with backend:", backendUrl);
 
   // Ensure path starts with a slash
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
 
-  return `${backendUrl}${normalizedPath}`;
+  // Ensure URL doesn't have trailing slash for consistency
+  const cleanBackendUrl = backendUrl.endsWith("/")
+    ? backendUrl.slice(0, -1)
+    : backendUrl;
+
+  return `${cleanBackendUrl}${normalizedPath}`;
 };
 
 /**

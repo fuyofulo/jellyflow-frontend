@@ -2,20 +2,16 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import GoogleSVG from "../logos/GoogleSVG";
-import { ButtonWithIcon } from "../buttons/ButtonWithIcon";
 import Link from "next/link";
 import { setToken } from "@/utils/auth";
 import { UnauthenticatedNavbar } from "../navigation/Navbar";
-import dotenv from "dotenv";
+import { buildApiUrl, API_ENDPOINTS } from "@/utils/api";
 
-dotenv.config();
-
+// Next.js environment variables are automatically loaded
+// Client components can only access NEXT_PUBLIC_ prefixed variables
 const backendurl = process.env.NEXT_PUBLIC_BACKEND_URL;
-
-if (!backendurl) {
-  throw new Error("Backend URL not configured");
-}
+console.log("backendurl", backendurl);
+// Move error checking to inside the component
 
 export default function Signin() {
   const router = useRouter();
@@ -23,6 +19,16 @@ export default function Signin() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Check for backend URL on component initialization
+  React.useEffect(() => {
+    if (!backendurl) {
+      setError(
+        "Backend URL not configured. Please check environment variables."
+      );
+      console.error("Backend URL not configured");
+    }
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -67,12 +73,18 @@ export default function Signin() {
       return;
     }
 
+    if (!backendurl) {
+      setError(
+        "Backend URL not configured. Please check environment variables."
+      );
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // Use hardcoded URL for signin
-      const signinUrl = `${backendurl}/api/v1/user/signin`;
-      console.log("Using hardcoded signin URL:", signinUrl);
+      const signinUrl = backendurl + API_ENDPOINTS.SIGNIN;
+      console.log("Using backend URL for signin:", signinUrl);
 
       const response = await fetch(signinUrl, {
         method: "POST",
@@ -215,8 +227,6 @@ export default function Signin() {
                 </button>
               </div>
             </form>
-
-            
 
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-400 font-mono">

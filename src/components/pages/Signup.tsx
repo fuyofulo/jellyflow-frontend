@@ -8,15 +8,11 @@ import Link from "next/link";
 import { UnauthenticatedNavbar } from "../navigation/Navbar";
 import { buildApiUrl, API_ENDPOINTS } from "@/utils/api";
 import { removeToken } from "@/utils/auth";
-import dotenv from "dotenv";
 
-dotenv.config();
-
+// Next.js environment variables are automatically loaded
+// Client components can only access NEXT_PUBLIC_ prefixed variables
 const backendurl = process.env.NEXT_PUBLIC_BACKEND_URL;
-
-if (!backendurl) {
-  throw new Error("Backend URL not configured");
-}
+console.log("backendurl in Signup:", backendurl);
 
 export default function Signup() {
   const router = useRouter();
@@ -26,6 +22,16 @@ export default function Signup() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Check for backend URL on component initialization
+  React.useEffect(() => {
+    if (!backendurl) {
+      setError(
+        "Backend URL not configured. Please check environment variables."
+      );
+      console.error("Backend URL not configured");
+    }
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name: fieldName, value } = e.target;
@@ -89,12 +95,18 @@ export default function Signup() {
       return;
     }
 
+    if (!backendurl) {
+      setError(
+        "Backend URL not configured. Please check environment variables."
+      );
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // Use hardcoded API URL for signup
-      const signupUrl = `${backendurl}/api/v1/user/signup`;
-      console.log("Using hardcoded signup URL:", signupUrl);
+      const signupUrl = backendurl + API_ENDPOINTS.SIGNUP;
+      console.log("Using backend URL for signup:", signupUrl);
 
       const response = await fetch(signupUrl, {
         method: "POST",
