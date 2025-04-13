@@ -182,12 +182,26 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
   useEffect(() => {
     console.log("WebhookPanel: Node data received:", node?.data);
 
+    // Helper function to ensure webhook URL uses http
+    const ensureHttpWebhookUrl = (url: string | undefined) => {
+      if (!url) return url;
+      // Replace https with http in the webhook URL
+      return url.replace(
+        "https://jellyflow2.duckdns.org",
+        "http://jellyflow2.duckdns.org"
+      );
+    };
+
     // Check if there's webhook data in node.data.metadata.webhook
     if (node?.data?.metadata?.webhook) {
       console.log("WebhookPanel: Found webhook data in node metadata");
+      const existingConfig = node.data.metadata.webhook;
+
       setWebhookConfig({
         ...webhookConfig,
-        ...node.data.metadata.webhook,
+        ...existingConfig,
+        // Ensure URL uses http
+        url: ensureHttpWebhookUrl(existingConfig.url),
       });
     }
     // Check for webhook URL in triggerMetadata (from existing zap data)
@@ -195,7 +209,9 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
       console.log("WebhookPanel: Found webhook URL in triggerMetadata");
       setWebhookConfig({
         ...webhookConfig,
-        url: node.data.metadata.triggerMetadata.webhook.url,
+        url: ensureHttpWebhookUrl(
+          node.data.metadata.triggerMetadata.webhook.url
+        ),
         urlGenerated: true,
         setupCompleted: true,
       });
@@ -205,7 +221,7 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
       console.log("WebhookPanel: Found webhook URL directly in node data");
       setWebhookConfig({
         ...webhookConfig,
-        url: node.data.webhookUrl,
+        url: ensureHttpWebhookUrl(node.data.webhookUrl),
         urlGenerated: true,
         setupCompleted: true,
       });
@@ -742,16 +758,31 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
           <div className="relative">
             <input
               type="text"
-              value={webhookConfig.url || ""}
+              value={
+                webhookConfig.url.replace(
+                  "https://jellyflow2.duckdns.org",
+                  "http://jellyflow2.duckdns.org"
+                ) || ""
+              }
               readOnly
               className="w-full bg-zinc-800 border border-zinc-700 rounded text-white px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50 pr-10 font-mono overflow-x-auto text-ellipsis"
-              title={webhookConfig.url}
+              title={webhookConfig.url.replace(
+                "https://jellyflow2.duckdns.org",
+                "http://jellyflow2.duckdns.org"
+              )}
             />
             <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
               <button
                 className="text-zinc-400 hover:text-white"
                 onClick={() => {
-                  navigator.clipboard.writeText(webhookConfig.url || "");
+                  navigator.clipboard.writeText(
+                    webhookConfig.url
+                      ? webhookConfig.url.replace(
+                          "https://jellyflow2.duckdns.org",
+                          "http://jellyflow2.duckdns.org"
+                        )
+                      : ""
+                  );
                   setSuccess("URL copied to clipboard!");
                   setTimeout(() => setSuccess(null), 2000);
                 }}
