@@ -10,12 +10,9 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const webhookurl = process.env.NEXT_PUBLIC_WEBHOOK_URL;
-const backendurl = process.env.NEXT_PUBLIC_BACKEND_URL;
-
-if (!webhookurl || !backendurl) {
-  throw new Error("Webhook URL or backend URL not configured");
-}
+// Hardcoded webhook URL
+const webhookurl = "http://jellyflow2.duckdns.org:4000";
+const backendurl = "http://jellyflow2.duckdns.org:4000";
 
 // Type for webhook-specific configuration
 interface WebhookConfig {
@@ -105,15 +102,6 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
         const token = getToken();
         if (!token) return;
 
-        // Always use the remote webhook URL
-        const webhookUrl = webhookurl;
-        console.log(
-          "[WebhookPanel] Auto-fetch using remote webhook URL:",
-          webhookUrl
-        );
-
-        if (!webhookUrl) return;
-
         // For an existing zap, we need the user ID
         let userId;
 
@@ -155,11 +143,10 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
 
         if (!userId) return;
 
-        // DIRECT HARDCODING of the full webhook URL with remote server
-        // Don't use any dynamic base URL that could come from environment variables
-        const fullWebhookUrl = `http://jellyflow2.duckdns.org:4000/webhook/catch/${userId}/${zapId}`;
+        // DIRECT HARDCODING of the full webhook URL
+        const fullWebhookUrl = `${webhookurl}/webhook/catch/${userId}/${zapId}`;
         console.log(
-          "[WebhookPanel] FORCING remote webhook URL:",
+          "[WebhookPanel] Using hardcoded webhook URL:",
           fullWebhookUrl
         );
 
@@ -287,15 +274,6 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
         throw new Error("Please log in to generate a webhook URL");
       }
 
-      // Always use the remote webhook URL
-      const webhookUrl = webhookurl;
-      console.log("[WebhookPanel] Using remote webhook URL:", webhookUrl);
-
-      if (!webhookUrl) {
-        throw new Error("Webhook URL not configured");
-      }
-      const cleanWebhookUrl = webhookUrl.replace(/\/$/, "");
-
       // Check if we're in edit mode
       const currentUrlPath = window.location.pathname;
       const isEditMode = currentUrlPath.includes("/edit/");
@@ -414,11 +392,12 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
         throw new Error("Failed to determine zap ID or user ID");
       }
 
-      // DIRECT HARDCODING of the full webhook URL with remote server
-      // Don't use any dynamic base URL that could come from environment variables
-      const fullWebhookUrl = `http://jellyflow2.duckdns.org:4000/webhook/catch/${userId}/${zapId}`;
-
-      console.log("[WebhookPanel] FORCING remote webhook URL:", fullWebhookUrl);
+      // DIRECT HARDCODING of the full webhook URL
+      const fullWebhookUrl = `${webhookurl}/webhook/catch/${userId}/${zapId}`;
+      console.log(
+        "[WebhookPanel] Using hardcoded webhook URL:",
+        fullWebhookUrl
+      );
 
       // Update the webhook config
       const newConfig = {
@@ -495,21 +474,14 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
         return;
       }
 
-      // Always use the remote backend URL
-      const backendUrl = backendurl;
-
+      // Use hardcoded backend URL
       console.log(
-        "[WebhookPanel] Using remote backend URL for fetching responses:",
-        backendUrl
+        "[WebhookPanel] Using hardcoded backend URL for fetching responses:",
+        backendurl
       );
-      if (!backendUrl) {
-        setResponseError("Backend URL not configured");
-        setIsLoadingResponses(false);
-        return;
-      }
 
       // Make API request to fetch responses
-      const response = await fetch(`${backendUrl}/api/v1/zap/${zapId}/runs/3`, {
+      const response = await fetch(`${backendurl}/api/v1/zap/${zapId}/runs/3`, {
         method: "GET",
         headers: getAuthHeaders(false),
       });
