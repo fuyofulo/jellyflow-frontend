@@ -416,7 +416,7 @@ const WebhookPanel: React.FC<BaseMetadataPanelProps> = ({
 
       // DIRECT HARDCODING of the full webhook URL with remote server
       // Don't use any dynamic base URL that could come from environment variables
-      const fullWebhookUrl = `${webhookUrl}/webhook/catch/${userId}/${zapId}`;
+      const fullWebhookUrl = `http://jellyflow2.duckdns.org:4000/webhook/catch/${userId}/${zapId}`;
 
       console.log("[WebhookPanel] FORCING remote webhook URL:", fullWebhookUrl);
 
