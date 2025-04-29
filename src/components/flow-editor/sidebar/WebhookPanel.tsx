@@ -12,7 +12,7 @@ dotenv.config();
 
 // Hardcoded webhook URL
 const webhookurl = "http://jellyflow2.duckdns.org:4000";
-const backendurl = "https://jellyflow2.duckdns.org:4000";
+const backendurl = "https://jellyflow2.duckdns.org";
 
 // Type for webhook-specific configuration
 interface WebhookConfig {
