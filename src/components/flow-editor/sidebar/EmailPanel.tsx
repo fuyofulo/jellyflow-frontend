@@ -425,6 +425,7 @@ const EmailPanel: React.FC<BaseMetadataPanelProps> = ({
   // Update email body
   const handleBodyChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newBody = e.target.value;
+    console.log(newBody);
     const newConfig = { ...emailConfig, body: newBody };
     setEmailConfig(newConfig);
     updateMetadata(newConfig);
